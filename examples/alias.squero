@@ -1,0 +1,5 @@
+:::\squero-alias1 /This page lets you define  your custom alias
+:::\squero-alias2 /Squero typically doesn't need alias, but you might want shortcuts for markup of frequent use
+:::\squero-alias3 /Replace the example below to set your own alias. Call them in your files simply as ":::\alias"
+:::\squero-alias4 /Aliases are composable: you can add attributes like this ":::\alias #row ?data-alias[anything] /comment"
+:::\example . section +widgets ?lang[en] ?role[complementary] /use: ":::\example #meteo-box ?aria-labelledby[meteo] /"

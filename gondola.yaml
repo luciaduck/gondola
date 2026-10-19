@@ -1,0 +1,37 @@
+#This is a stub for gondola.yaml configuration file
+config:
+  site-name: ""
+  version: ""
+  description: ""
+  canonical-url: ""
+  sass: true
+  fenced-blocks: false #if true squero is used | checks for any file ending with .squero to use it as alias.squero 
+  markdown: true #if false, goldmark won't be used
+  plugin: #array: calls plugin in root
+  engine: jet #at the moment this is goinf to be the only supported engine, but I'm leaving it open to future variation
+  sitemap: false #if true, then sitemap.go works
+  date-format: 1234567 #let the user decide how they want to show the date, using golang native convention
+  serve: false
+  port: 1094 #serve must be true to use this value
+
+input:
+  content: .
+  templates: _components/includes
+  data: _data
+  partials: _components/sass
+  
+output:
+  routing: file #other option is directory
+  directory: _site
+  passthrough: #array: contains files or path names, counting from the root where gondola is lauched
+
+default: #this will pass default values to the engine, unless the frontmatter specifies otherwise
+  layout: nil
+  title: "" #jet receives "" -> reason: a frontmatter with no value for key would make jet fail
+  author: ""
+  date: ""
+  permalink: path #other options are slug and date, can be overridden in frontmatter by any of this or the precise custom url
+  robots-agent: * 
+  #the user will add the other frontmatter key they intend to give a default value to, otherwise they're all treated as ""
+
+  
