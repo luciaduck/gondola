@@ -1,3 +1,4 @@
+local/
 arsenale/
-notes.md
-spec-packages.md
+CLAUDE.md
+.claude/
