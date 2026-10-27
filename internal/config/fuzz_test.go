@@ -22,7 +22,7 @@ func FuzzParse(f *testing.F) {
 		withMinimal("  sass: false\n  port: 8080\n  plugin: [a/b.sh]\n"),
 		withMinimal("input:\n  content: src\n  templates: [src/_t, shared]\n  data: d\n"),
 		withMinimal("output:\n  routing: directory\n  directory: public\n  passthrough: [/robots.txt, .well-known/]\n"),
-		withMinimal("default:\n  layout: base\n  og-image: /x.png\n  author: {name: a}\n  permalink: date\n"),
+		withMinimal("default:\n  layout: base\n  og-image: /x.png\n  social: {name: a}\n  permalink: date\n"),
 		withMinimal("default: {città: 1, città: 2}\n"),
 		withMinimal("input:\n  templates: _site/x\n"),
 		withMinimal("output:\n  directory: ../x\n"),

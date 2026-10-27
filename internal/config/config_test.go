@@ -154,10 +154,11 @@ default:
 		Defaults: Defaults{
 			Permalink: PermalinkSlug,
 			Variables: map[string]any{
-				"layout":    "base",
-				"title":     "Untitled",
-				"author":    "Lucia",
-				"date":      "2026-01-01",
+				"layout": "base",
+				"title":  "Untitled",
+				"author": "Lucia",
+				// A quoted date is a date too, as in front matter.
+				"date":      time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 				"permalink": "slug",
 				"ogImage":   "/og.png",
 			},
@@ -247,7 +248,11 @@ func TestParseRealValuesAreKept(t *testing.T) {
 		{"user default zero values", "default:\n  draft: false\n  count: 0\n  tags: []\n", func(c *Config) {
 			c.Defaults.Variables["draft"] = false
 			c.Defaults.Variables["count"] = 0
-			c.Defaults.Variables["tags"] = []any{}
+			c.Defaults.Variables["tags"] = []string{}
+		}},
+		{"user default map with a number key", "default:\n  counts: {1: one, 02: two}\n", func(c *Config) {
+			// Nested keys stay text as written, so templates can read the map.
+			c.Defaults.Variables["counts"] = map[string]any{"1": "one", "02": "two"}
 		}},
 	}
 	for _, test := range tests {
@@ -385,10 +390,13 @@ func TestParseDefaults(t *testing.T) {
   Title: Home
   og-image: /og.png
   robots_agent: none
-  author:
+  author: Lucia
+  social:
     name: Lucia
     links: [a, b]
   città: Lindos
+  tags: news
+  sitemap: false
   weight: 2.5
   date: 2026-10-26
 `)
@@ -400,10 +408,15 @@ func TestParseDefaults(t *testing.T) {
 			"title":       "Home",
 			"ogImage":     "/og.png",
 			"robotsAgent": "none",
-			// Nested maps decode as map[string]any with yaml.v3.
-			"author": map[string]any{"name": "Lucia", "links": []any{"a", "b"}},
+			"author":      "Lucia",
+			// Nested maps are always map[string]any (see yamlnode.DecodeValue).
+			"social": map[string]any{"name": "Lucia", "links": []any{"a", "b"}},
 			"città":  "Lindos",
-			"weight": 2.5,
+			// The special keys follow the rules of front matter: one tag
+			// becomes a list.
+			"tags":    []string{"news"},
+			"sitemap": false,
+			"weight":  2.5,
 			// An unquoted date keeps its YAML type, as in frontmatter.
 			"date":      time.Date(2026, time.October, 26, 0, 0, 0, 0, time.UTC),
 			"permalink": "path",
@@ -491,7 +504,14 @@ func TestParseErrors(t *testing.T) {
 		{"key twice", withMinimal("  sass: true\n  sass: false\n"), `gondola.yaml:6:3: key "sass" appears twice in config (first at line 5); please keep only one`},
 		{"section twice", withMinimal("config:\n  port: 1\n"), `gondola.yaml:5:1: key "config" appears twice at the top level of gondola.yaml (first at line 1); please keep only one`},
 		{"default key twice", withMinimal("default:\n  x: 1\n  x: 2\n"), `gondola.yaml:7:3: key "x" appears twice in default (first at line 6); please keep only one`},
-		{"nested key twice", withMinimal("default:\n  author: {name: a, name: b}\n"), `gondola.yaml:6:1: invalid YAML: mapping key "name" already defined at line 6`},
+		{"nested key twice", withMinimal("default:\n  social: {name: a, name: b}\n"), `gondola.yaml:6:21: key "name" appears twice in default.social (first at line 6); please keep only one`},
+		{"default title not text", withMinimal("default:\n  title: [a]\n"), `gondola.yaml:6:10: default.title must be text, not a list`},
+		{"default author not text", withMinimal("default:\n  author: {name: a}\n"), `gondola.yaml:6:11: default.author must be text, not a map`},
+		{"default sitemap not a boolean", withMinimal("default:\n  sitemap: yes\n"), `gondola.yaml:6:12: default.sitemap must be true or false, not "yes"`},
+		{"default excludeFromFleet as written", withMinimal("default:\n  exclude-from-fleet: 1\n"), `gondola.yaml:6:23: default.exclude-from-fleet must be true or false, not "1"`},
+		{"default tags fleet", withMinimal("default:\n  tags: [a, fleet]\n"), `gondola.yaml:6:13: tag "fleet" is reserved by Gondola (templates use fleet for the collection of all pages); please rename it`},
+		{"default tags map", withMinimal("default:\n  tags: {a: 1}\n"), `gondola.yaml:6:9: default.tags must be a tag or a list of tags, not a map`},
+		{"default date not a date", withMinimal("default:\n  date: soon\n"), `gondola.yaml:6:9: default.date "soon" is not a date; please write it as YYYY-MM-DD, optionally followed by a time such as 2024-05-01T10:30:00Z`},
 		{"map as key", withMinimal("default:\n  ? {a: 1}\n  : x\n"), `gondola.yaml:6:5: keys in default must be names, not a map`},
 
 		// Shapes.
@@ -669,63 +689,6 @@ func TestParseErrorColumnCountsBytes(t *testing.T) {
 	}
 }
 
-func TestToFilePosition(t *testing.T) {
-	tests := []struct {
-		name string
-		src  string
-		// The position as yaml.v3 counts it: lines split at any of its line
-		// breaks, columns in characters.
-		yamlLine, yamlCol int
-		// The position as Gondola counts it: lines split at "\n", columns in
-		// bytes.
-		wantLine, wantCol int
-	}{
-		{"ascii", "ab\ncd\n", 2, 2, 2, 2},
-		{"first line", "abc\n", 1, 3, 1, 3},
-		{"after accents", "ab\nàè x\n", 2, 4, 2, 6},
-		{"column 1", "ab\nàè x\n", 2, 1, 2, 1},
-		{"column past the end of the line", "ab\nàè x\n", 2, 40, 2, 7},
-		{"line past the end", "ab\n", 9, 3, 2, 1},
-		{"no final line break", "ab\ncd", 2, 3, 2, 3},
-		{"past the end without final break", "ab\ncd", 2, 9, 2, 3},
-		{"CRLF", "ab\r\ncd\r\n", 2, 2, 2, 2},
-		{"lone CR", "ab\rcd\rxy\n", 3, 2, 1, 8},
-		{"NEL", "ab\u0085cd\n", 2, 2, 1, 6},
-		{"LS", "ab\u2028cd\nxy\n", 3, 1, 2, 1},
-		{"PS", "a\u2029é\u2029x\n", 3, 1, 1, 10},
-		{"LS after accents", "è\u2028x\n", 2, 1, 1, 6},
-		{"empty file", "", 1, 1, 1, 1},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := &diag.Error{File: FileName, Line: test.yamlLine, Col: test.yamlCol, Msg: "x"}
-			got, ok := toFilePosition(err, []byte(test.src)).(*diag.Error)
-			want := diag.Error{File: FileName, Line: test.wantLine, Col: test.wantCol, Msg: "x"}
-			if !ok || *got != want {
-				t.Errorf("toFilePosition(%d:%d) = %+v, want %+v", test.yamlLine, test.yamlCol, got, want)
-			}
-		})
-	}
-}
-
-func TestToFilePositionLeavesOthersAlone(t *testing.T) {
-	src := []byte("a\u2028b\n")
-	// No column: only the line is converted.
-	got := toFilePosition(&diag.Error{File: FileName, Line: 2, Msg: "x"}, src).(*diag.Error)
-	if want := (diag.Error{File: FileName, Line: 1, Msg: "x"}); *got != want {
-		t.Errorf("without a column: %+v, want %+v", got, want)
-	}
-	// No line: unchanged.
-	noLine := &diag.Error{File: FileName, Msg: "x"}
-	if got := toFilePosition(noLine, src); got != noLine {
-		t.Errorf("without a line: %v changed", got)
-	}
-	plain := errors.New("plain")
-	if got := toFilePosition(plain, src); got != plain {
-		t.Errorf("a plain error changed: %v", got)
-	}
-}
-
 func TestParseErrorPositionWithUnusualLineBreaks(t *testing.T) {
 	// yaml.v3 starts a new line at these, the console does not: the error
 	// must name the line the console will print.
@@ -803,7 +766,7 @@ func TestParseExcessiveAliasing(t *testing.T) {
 		fmt.Fprintf(&src, "  a%d: &a%d [%s]\n", level, level, strings.Repeat(previous+", ", 9)+previous)
 	}
 	_, err := Parse([]byte(src.String()))
-	want := `gondola.yaml: invalid YAML: document contains excessive aliasing`
+	want := `gondola.yaml:8:7: invalid YAML: document contains excessive aliasing`
 	if err == nil || err.Error() != want {
 		t.Errorf("error:\n got %v\nwant %s", err, want)
 	}

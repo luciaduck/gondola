@@ -1,10 +1,7 @@
 package config
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -13,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/luciaduck/gondola/internal/diag"
+	"github.com/luciaduck/gondola/internal/frontmatter"
 	"github.com/luciaduck/gondola/internal/naming"
+	"github.com/luciaduck/gondola/internal/yamlnode"
 	"gopkg.in/yaml.v3"
 )
 
@@ -72,10 +71,14 @@ type fileValues struct {
 	passthroughPatterns []string
 	permalink           Permalink
 	variables           map[string]any
+	// source is the whole file, for the line numbers written in messages
+	// about the values of default:.
+	source yamlnode.Source
 }
 
-func newFileValues() *fileValues {
+func newFileValues(src []byte) *fileValues {
 	return &fileValues{
+		source: yamlnode.Source{Text: src},
 		settings: Settings{
 			Description:  defaultDescription,
 			Sass:         defaultSass,
@@ -146,35 +149,16 @@ func paths(located []locatedPath) []string {
 }
 
 // parseDocument parses src into a node tree and returns its root, or nil
-// for a file with no content.
+// when the file holds no document.
 func parseDocument(src []byte) (*yaml.Node, error) {
-	decoder := yaml.NewDecoder(bytes.NewReader(src))
-	var document yaml.Node
-	if err := decoder.Decode(&document); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil, nil
-		}
-		return nil, yamlError(err)
-	}
-	// A second document would otherwise be ignored without a word.
-	var extraDocument yaml.Node
-	err := decoder.Decode(&extraDocument)
-	if err == nil {
-		return nil, errorAt(&extraDocument, "a second YAML document starts here; %s must hold only one, so please remove it", FileName)
-	}
-	if !errors.Is(err, io.EOF) {
-		return nil, yamlError(err)
-	}
-	if len(document.Content) == 0 {
-		return nil, nil
-	}
-	return document.Content[0], nil
+	root, err := yamlnode.ParseDocument(src, FileName)
+	return root, diag.WithFile(err, FileName)
 }
 
 // readRoot reads the four sections, then checks that the required keys were
 // written.
 func (v *fileValues) readRoot(root *yaml.Node) error {
-	if root != nil && !isEmpty(root) {
+	if root != nil && !yamlnode.IsEmpty(root) {
 		if err := v.readSections(root); err != nil {
 			return err
 		}
@@ -183,9 +167,9 @@ func (v *fileValues) readRoot(root *yaml.Node) error {
 }
 
 func (v *fileValues) readSections(root *yaml.Node) error {
-	mapping := resolved(root)
+	mapping := yamlnode.Resolved(root)
 	if mapping.Kind != yaml.MappingNode {
-		return errorAt(root, "%s must be a map with the sections config, input, output and default, not %s", FileName, describe(root))
+		return errorAt(root, "%s must be a map with the sections config, input, output and default, not %s", FileName, yamlnode.Describe(root))
 	}
 	items, err := entries(mapping, atTopLevel)
 	if err != nil {
@@ -205,12 +189,12 @@ func (v *fileValues) readSections(root *yaml.Node) error {
 		default:
 			return errorAt(item.keyNode, "unknown key %q %s; please remove it or check its spelling", item.key, atTopLevel)
 		}
-		if isEmpty(item.valueNode) {
+		if yamlnode.IsEmpty(item.valueNode) {
 			continue
 		}
-		section := resolved(item.valueNode)
+		section := yamlnode.Resolved(item.valueNode)
 		if section.Kind != yaml.MappingNode {
-			return errorAt(item.valueNode, "%s must be a map of keys, not %s", item.key, describe(item.valueNode))
+			return errorAt(item.valueNode, "%s must be a map of keys, not %s", item.key, yamlnode.Describe(item.valueNode))
 		}
 		if err := readSection(section); err != nil {
 			return err
@@ -364,17 +348,20 @@ func (v *fileValues) readDefault(name, label string, item keyValue) error {
 		}
 		v.variables[name] = layout
 		return nil
-	case isEmpty(item.valueNode) && builtIn:
+	case yamlnode.IsEmpty(item.valueNode) && builtIn:
 		return nil
-	case isEmpty(item.valueNode):
+	case yamlnode.IsEmpty(item.valueNode):
 		// Templates fail on undefined variables, so a key the user declared
 		// always exists, even when it was left empty.
 		v.variables[name] = ""
 		return nil
 	}
-	var value any
-	if err := item.valueNode.Decode(&value); err != nil {
-		return yamlError(err)
+	// The special keys (tags, date, sitemap, …) follow the same rules as in
+	// front matter, so they are read by the same function.
+	key := frontmatter.Key{Written: item.key, InDefault: true}
+	value, err := frontmatter.ReadValue(name, key, item.valueNode, v.source)
+	if err != nil {
+		return diag.WithFile(err, FileName)
 	}
 	v.variables[name] = value
 	return nil
@@ -402,12 +389,12 @@ func (v *fileValues) checkRequired() error {
 // empty (null or ""), so the default stays.
 
 func readText(target *string, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind != yaml.ScalarNode {
-		return errorAt(item.valueNode, "%s must be text, not %s", label, describe(item.valueNode))
+		return errorAt(item.valueNode, "%s must be text, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	// Value is the text as written, so 0.10 stays "0.10".
 	*target = value.Value
@@ -415,29 +402,29 @@ func readText(target *string, label string, item keyValue) error {
 }
 
 func readRequiredText(target *string, label, purpose string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return errorAt(item.keyNode, "%s is empty; please set %s", label, purpose)
 	}
 	return readText(target, label, item)
 }
 
 func readBool(target *bool, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	if resolved(item.valueNode).ShortTag() != "!!bool" {
-		return errorAt(item.valueNode, "%s must be true or false, not %s", label, describe(item.valueNode))
+	if yamlnode.Resolved(item.valueNode).ShortTag() != "!!bool" {
+		return errorAt(item.valueNode, "%s must be true or false, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	return item.valueNode.Decode(target)
 }
 
 func readPort(target *int, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.ShortTag() != "!!int" {
-		return errorAt(item.valueNode, "%s must be a whole number, not %s", label, describe(item.valueNode))
+		return errorAt(item.valueNode, "%s must be a whole number, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	var port int64
 	// A number too large for int64 fails to decode; it is out of range too.
@@ -452,10 +439,10 @@ func readPort(target *int, label string, item keyValue) error {
 // lets one function fill a Routing, a Permalink or an Engine: "~string"
 // accepts any type whose underlying type is string.
 func readChoice[T ~string](target *T, label string, item keyValue, choices []T) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind == yaml.ScalarNode {
 		for _, choice := range choices {
 			if value.Value == string(choice) {
@@ -464,14 +451,14 @@ func readChoice[T ~string](target *T, label string, item keyValue, choices []T) 
 			}
 		}
 	}
-	return errorAt(item.valueNode, "%s is %s; it must be %s", label, describe(item.valueNode), quotedChoices(choices))
+	return errorAt(item.valueNode, "%s is %s; it must be %s", label, yamlnode.Describe(item.valueNode), quotedChoices(choices))
 }
 
 func readPermalink(target *Permalink, label string, item keyValue) error {
 	choices := []Permalink{PermalinkPath, PermalinkSlug, PermalinkDate}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind == yaml.ScalarNode && strings.HasPrefix(value.Value, "/") {
-		return errorAt(item.valueNode, "%s is %s; it must be %s (custom permalinks go in a page's front matter)", label, describe(item.valueNode), quotedChoices(choices))
+		return errorAt(item.valueNode, "%s is %s; it must be %s (custom permalinks go in a page's front matter)", label, yamlnode.Describe(item.valueNode), quotedChoices(choices))
 	}
 	return readChoice(target, label, item, choices)
 }
@@ -515,12 +502,12 @@ func readCanonicalURL(target *string, label string, item keyValue) error {
 }
 
 func readPath(target *locatedPath, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind != yaml.ScalarNode {
-		return errorAt(item.valueNode, "%s must be a path, not %s", label, describe(item.valueNode))
+		return errorAt(item.valueNode, "%s must be a path, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	cleaned, err := cleanPath(label, item.valueNode, value.Value)
 	if err != nil {
@@ -532,10 +519,10 @@ func readPath(target *locatedPath, label string, item keyValue) error {
 
 // readDirList reads a key that accepts a path or a list of paths.
 func readDirList(target *locatedDirList, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	switch value.Kind {
 	case yaml.ScalarNode:
 		cleaned, err := cleanPath(label, item.valueNode, value.Value)
@@ -559,17 +546,17 @@ func readDirList(target *locatedDirList, label string, item keyValue) error {
 		*target = locatedDirList{dirs: dirs}
 		return nil
 	}
-	return errorAt(item.valueNode, "%s must be a path or a list of paths, not %s", label, describe(item.valueNode))
+	return errorAt(item.valueNode, "%s must be a path or a list of paths, not %s", label, yamlnode.Describe(item.valueNode))
 }
 
 // readPathList reads a key that accepts only a list of paths.
 func readPathList(target *[]locatedPath, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind != yaml.SequenceNode {
-		return errorAt(item.valueNode, "%s must be a list of paths, not %s", label, describe(item.valueNode))
+		return errorAt(item.valueNode, "%s must be a list of paths, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	var located []locatedPath
 	if err := readPathItems(&located, label, value); err != nil {
@@ -599,12 +586,12 @@ func readPathItems(target *[]locatedPath, label string, sequence *yaml.Node) err
 // readPatternList reads output.passthrough. The patterns are kept as
 // written: package scan checks and matches them.
 func readPatternList(target *[]string, label string, item keyValue) error {
-	if isEmpty(item.valueNode) {
+	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
-	value := resolved(item.valueNode)
+	value := yamlnode.Resolved(item.valueNode)
 	if value.Kind != yaml.SequenceNode {
-		return errorAt(item.valueNode, "%s must be a list of patterns, not %s", label, describe(item.valueNode))
+		return errorAt(item.valueNode, "%s must be a list of patterns, not %s", label, yamlnode.Describe(item.valueNode))
 	}
 	patterns := make([]string, 0, len(value.Content))
 	for _, entry := range value.Content {
@@ -621,12 +608,12 @@ func readPatternList(target *[]string, label string, item keyValue) error {
 // listItem returns the text of one entry of a list. what is the kind of
 // entry for messages, such as "a path".
 func listItem(label, what string, entry *yaml.Node) (string, error) {
-	if isEmpty(entry) {
+	if yamlnode.IsEmpty(entry) {
 		return "", errorAt(entry, "%s has an empty entry; please remove it", label)
 	}
-	value := resolved(entry)
+	value := yamlnode.Resolved(entry)
 	if value.Kind != yaml.ScalarNode {
-		return "", errorAt(entry, "each entry of %s must be %s, not %s", label, what, describe(entry))
+		return "", errorAt(entry, "each entry of %s must be %s, not %s", label, what, yamlnode.Describe(entry))
 	}
 	return value.Value, nil
 }
@@ -666,10 +653,10 @@ func entries(mapping *yaml.Node, where string) ([]keyValue, error) {
 	// Content holds the keys and values one after the other.
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		keyNode, valueNode := mapping.Content[i], mapping.Content[i+1]
-		if resolved(keyNode).Kind != yaml.ScalarNode {
-			return nil, errorAt(keyNode, "keys %s must be names, not %s", where, describe(keyNode))
+		if yamlnode.Resolved(keyNode).Kind != yaml.ScalarNode {
+			return nil, errorAt(keyNode, "keys %s must be names, not %s", where, yamlnode.Describe(keyNode))
 		}
-		key := resolved(keyNode).Value
+		key := yamlnode.Resolved(keyNode).Value
 		if firstLine, seen := firstLineByKey[key]; seen {
 			return nil, errorAt(keyNode, "key %q appears twice %s (first at line %d); please keep only one", key, where, firstLine)
 		}
@@ -677,41 +664,6 @@ func entries(mapping *yaml.Node, where string) ([]keyValue, error) {
 		items = append(items, keyValue{key: key, keyNode: keyNode, valueNode: valueNode})
 	}
 	return items, nil
-}
-
-// resolved returns the node that an alias (*name) points to, or node itself.
-// Positions are still taken from the alias, which is where the user wrote
-// the value.
-func resolved(node *yaml.Node) *yaml.Node {
-	if node.Kind == yaml.AliasNode && node.Alias != nil {
-		return node.Alias
-	}
-	return node
-}
-
-// isEmpty reports whether node is null (written as null, ~ or nothing) or
-// the empty string, which both mean "use the default". A tag does not change
-// this: a tag with no text after it, such as "!x" or `!!str ""`, is empty
-// too. The tag is checked first because "null" and "~" have text.
-func isEmpty(node *yaml.Node) bool {
-	value := resolved(node)
-	if value.Kind != yaml.ScalarNode {
-		return false
-	}
-	return value.ShortTag() == "!!null" || value.Value == ""
-}
-
-// describe names a value for messages: "a map", "a list", or the scalar
-// quoted as written.
-func describe(node *yaml.Node) string {
-	value := resolved(node)
-	switch value.Kind {
-	case yaml.MappingNode:
-		return "a map"
-	case yaml.SequenceNode:
-		return "a list"
-	}
-	return strconv.Quote(value.Value)
 }
 
 // errorAt returns an error at the position of node in gondola.yaml, or an

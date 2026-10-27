@@ -4,7 +4,6 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 
 	"github.com/luciaduck/gondola/internal/diag"
+	"github.com/luciaduck/gondola/internal/frontmatter"
+	"github.com/luciaduck/gondola/internal/yamlnode"
 )
 
 // FileName is the name of the configuration file, read from the project
@@ -24,8 +25,9 @@ const FileName = "gondola.yaml"
 const TempDirSuffix = ".temp"
 
 // NoLayout is the layout value that means "no layout": the page is not run
-// through the template engine at all.
-const NoLayout = "nil"
+// through the template engine at all. It is defined by package frontmatter,
+// which also reads the layout key of layout templates.
+const NoLayout = frontmatter.NoLayout
 
 // Routing decides the shape of output paths (SPEC §5.7).
 type Routing string
@@ -178,8 +180,10 @@ type Defaults struct {
 	Permalink Permalink
 	// Variables holds every entry of default:, the built-in ones (layout,
 	// title, author, date, permalink) and the user's own, keyed by template
-	// name ("og-image" becomes "ogImage"). Values keep their YAML types; a
-	// user key left empty holds "".
+	// name ("og-image" becomes "ogImage"). Values are read as in front
+	// matter (frontmatter.ReadValue): the special keys have their types,
+	// such as a []string for tags, and other values keep their YAML types;
+	// a user key left empty holds "".
 	Variables map[string]any
 }
 
@@ -204,33 +208,20 @@ func Load(projectDir string) (Config, error) {
 func Parse(src []byte) (Config, error) {
 	config, err := parse(src)
 	if err != nil {
-		return Config{}, toFilePosition(err, src)
+		return Config{}, yamlnode.Source{Text: src}.ToFilePosition(err)
 	}
 	return config, nil
 }
 
-// utf16ByteOrderMarks start a file saved as UTF-16, little-endian and
-// big-endian. Windows PowerShell 5.1 writes such files by default.
-var utf16ByteOrderMarks = [][]byte{{0xFF, 0xFE}, {0xFE, 0xFF}}
-
-// utf16Message is the error for a file saved as UTF-16. It has no position:
-// the console could not print a line of such a file.
-const utf16Message = "the file is saved as UTF-16; please save it as UTF-8"
-
 func parse(src []byte) (Config, error) {
-	// yaml.v3 would read UTF-16, but the positions in its errors would count
-	// the decoded text, not the bytes of the file, and every other source
-	// file Gondola reads is UTF-8. A UTF-8 byte order mark is fine.
-	for _, byteOrderMark := range utf16ByteOrderMarks {
-		if bytes.HasPrefix(src, byteOrderMark) {
-			return Config{}, &diag.Error{File: FileName, Msg: utf16Message}
-		}
+	if err := yamlnode.CheckEncoding(src); err != nil {
+		return Config{}, diag.WithFile(err, FileName)
 	}
 	root, err := parseDocument(src)
 	if err != nil {
 		return Config{}, err
 	}
-	values := newFileValues()
+	values := newFileValues(src)
 	if err := values.readRoot(root); err != nil {
 		return Config{}, err
 	}
