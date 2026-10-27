@@ -70,18 +70,18 @@ func (v *fileValues) checkDirectories() error {
 	inputDirs := v.inputRoleDirs()
 	deletedDirs := v.deletedDirs()
 	for _, role := range append(append([]roleDir{}, inputDirs...), deletedDirs...) {
-		if err := checkApartFromContent(role, v.contentDir); err != nil {
+		if err := v.directories.checkApartFromContent(role, v.contentDir); err != nil {
 			return err
 		}
 	}
 	for _, deleted := range deletedDirs {
 		for _, input := range inputDirs {
-			if err := checkApartFromDeleted(deleted, input); err != nil {
+			if err := v.directories.checkApartFromDeleted(deleted, input); err != nil {
 				return err
 			}
 		}
 		for _, plugin := range v.pluginPaths {
-			if isWithin(plugin.path, deleted.dir.path) {
+			if v.directories.isWithin(plugin.path, deleted.dir.path) {
 				return errorAt(firstNode(deleted.dir.node, plugin.node), "%s contains config.plugin %q; every build deletes it, so please move the plugin or choose another output directory", deleted.subject, plugin.path)
 			}
 		}
@@ -91,13 +91,13 @@ func (v *fileValues) checkDirectories() error {
 
 // checkApartFromContent checks that role may be inside the content
 // directory but is neither the content directory nor contains it.
-func checkApartFromContent(role roleDir, content locatedPath) error {
+func (c pathComparer) checkApartFromContent(role roleDir, content locatedPath) error {
 	const rule = "role directories may be inside it but must not be it or contain it"
 	at := firstNode(role.dir.node, content.node)
-	if role.dir.path == content.path {
+	if c.equal(role.dir.path, content.path) {
 		return errorAt(at, "%s is the content directory; %s", role.subject, rule)
 	}
-	if isWithin(content.path, role.dir.path) {
+	if c.isWithin(content.path, role.dir.path) {
 		return errorAt(at, "%s contains the content directory %q; %s", role.subject, content.path, rule)
 	}
 	return nil
@@ -105,23 +105,42 @@ func checkApartFromContent(role roleDir, content locatedPath) error {
 
 // checkApartFromDeleted checks that a directory a build deletes neither
 // equals, contains nor sits inside an input directory.
-func checkApartFromDeleted(deleted, input roleDir) error {
+func (c pathComparer) checkApartFromDeleted(deleted, input roleDir) error {
 	at := firstNode(deleted.dir.node, input.dir.node)
 	switch {
-	case deleted.dir.path == input.dir.path:
+	case c.equal(deleted.dir.path, input.dir.path):
 		return errorAt(at, "%s is also used by %s; every build deletes it, so please choose another output directory", deleted.subject, input.label)
-	case isWithin(input.dir.path, deleted.dir.path):
+	case c.isWithin(input.dir.path, deleted.dir.path):
 		return errorAt(at, "%s contains %s; every build deletes it, so please choose another output directory", deleted.subject, input.subject)
-	case isWithin(deleted.dir.path, input.dir.path):
+	case c.isWithin(deleted.dir.path, input.dir.path):
 		return errorAt(at, "%s is inside %s; please choose an output directory outside it", deleted.subject, input.subject)
 	}
 	return nil
 }
 
+// pathComparer compares cleaned relative paths written with "/", the way
+// the project's file system compares names: by their letters exactly, or
+// ignoring letter case.
+type pathComparer struct {
+	ignoresLetterCase bool
+}
+
+// comparable returns path in the form that is compared.
+func (c pathComparer) comparable(path string) string {
+	if c.ignoresLetterCase {
+		return strings.ToLower(path)
+	}
+	return path
+}
+
+func (c pathComparer) equal(a, b string) bool {
+	return c.comparable(a) == c.comparable(b)
+}
+
 // isWithin reports whether the cleaned relative path is parentDir or inside
-// it. The comparison is by text: two spellings of one directory that differ
-// in letter case are not caught here.
-func isWithin(path, parentDir string) bool {
+// it.
+func (c pathComparer) isWithin(path, parentDir string) bool {
+	path, parentDir = c.comparable(path), c.comparable(parentDir)
 	return parentDir == "." || path == parentDir || strings.HasPrefix(path, parentDir+"/")
 }
 

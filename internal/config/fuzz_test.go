@@ -10,11 +10,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/luciaduck/gondola/internal/diag"
+	"github.com/luciaduck/gondola/internal/sourcetext"
 )
 
 // FuzzParse checks that Parse never panics, that every error names
 // gondola.yaml at a position the console can show, and that every accepted
-// file gives a configuration that keeps the promises of the package.
+// file gives a configuration that keeps the promises of the package. Each
+// input is parsed twice: comparing directories by their exact letters, and
+// ignoring letter case, as Load does on such a file system.
 func FuzzParse(f *testing.F) {
 	seeds := []string{
 		"",
@@ -42,29 +45,47 @@ func FuzzParse(f *testing.F) {
 		// refused.
 		"\ufeffconfig:\n  sas: 1\n",
 		"\xff\xfec\x00:\x00 \x00[\x00\n\x00",
+		// Directories that differ only in letter case.
+		withMinimal("input:\n  content: Site\n  templates: site/_t\noutput:\n  directory: SITE/_t/x\n"),
 	}
 	for _, seed := range seeds {
 		f.Add([]byte(seed))
 	}
 	f.Fuzz(func(t *testing.T, src []byte) {
-		config, err := Parse(src)
-		if err != nil {
-			var diagErr *diag.Error
-			if !errors.As(err, &diagErr) || diagErr.File != FileName {
-				t.Fatalf("error %q is not a diag.Error naming %s", err, FileName)
-			}
-			checkErrorPosition(t, diagErr, src)
-			return
-		}
-		checkInvariants(t, config)
-		again, err := Parse(src)
-		if err != nil || !reflect.DeepEqual(config, again) {
-			t.Fatalf("a second Parse gave a different result: %v", err)
+		exact := checkParse(t, src, false)
+		ignoringCase := checkParse(t, src, true)
+		// Ignoring letter case only finds more directories that clash, so it
+		// never accepts a file that the exact comparison refuses.
+		if !exact && ignoringCase {
+			t.Fatalf("accepted only when ignoring letter case")
 		}
 	})
 }
 
-func checkInvariants(t *testing.T, config Config) {
+// checkParse parses src and checks the result, reporting whether src was
+// accepted.
+func checkParse(t *testing.T, src []byte, ignoresLetterCase bool) bool {
+	t.Helper()
+	config, err := parseFile(src, ignoresLetterCase)
+	if err != nil {
+		var diagErr *diag.Error
+		if !errors.As(err, &diagErr) || diagErr.File != FileName {
+			t.Fatalf("error %q is not a diag.Error naming %s", err, FileName)
+		}
+		// Positions do not count a byte order mark (SPEC §4), so they are
+		// checked against the text without it.
+		checkErrorPosition(t, diagErr, sourcetext.TrimByteOrderMark(src))
+		return false
+	}
+	checkInvariants(t, config, src)
+	again, err := parseFile(src, ignoresLetterCase)
+	if err != nil || !reflect.DeepEqual(config, again) {
+		t.Fatalf("a second Parse gave a different result: %v", err)
+	}
+	return true
+}
+
+func checkInvariants(t *testing.T, config Config, src []byte) {
 	t.Helper()
 	settings := config.Settings
 	if settings.SiteName == "" || settings.SiteVersion == "" {
@@ -113,22 +134,31 @@ func checkInvariants(t *testing.T, config Config) {
 			t.Fatalf("path %q is not clean and relative", written)
 		}
 	}
+	directories := pathComparer{ignoresLetterCase: config.IgnoresLetterCase}
 	for _, role := range append(append([]string{}, inputDirs...), deletedDirs...) {
-		if isWithin(input.ContentDir, role) {
+		if directories.isWithin(input.ContentDir, role) {
 			t.Fatalf("role directory %q is or contains content %q", role, input.ContentDir)
 		}
 	}
 	for _, deleted := range deletedDirs {
 		for _, kept := range append(append([]string{}, inputDirs...), settings.PluginPaths...) {
-			if isWithin(kept, deleted) {
+			if directories.isWithin(kept, deleted) {
 				t.Fatalf("deleted directory %q holds %q", deleted, kept)
 			}
 		}
 		for _, inputDir := range inputDirs {
-			if isWithin(deleted, inputDir) {
+			if directories.isWithin(deleted, inputDir) {
 				t.Fatalf("deleted directory %q is inside %q", deleted, inputDir)
 			}
 		}
+	}
+	// The positions kept for package scan must be printable too.
+	positions := []Position{input.ContentDirPosition}
+	for _, pattern := range config.Output.PassthroughPatterns {
+		positions = append(positions, pattern.Position)
+	}
+	for _, position := range positions {
+		checkErrorPosition(t, position.Errorf("x").(*diag.Error), sourcetext.TrimByteOrderMark(src))
 	}
 }
 

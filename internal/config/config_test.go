@@ -54,7 +54,7 @@ func defaultConfig() Config {
 		Output: Output{
 			Routing:             RoutingFile,
 			Dir:                 "_site",
-			PassthroughPatterns: []string{},
+			PassthroughPatterns: []PassthroughPattern{},
 		},
 		Defaults: Defaults{
 			Permalink: PermalinkPath,
@@ -141,15 +141,20 @@ default:
 			Port:         8080,
 		},
 		Input: Input{
-			ContentDir:   "src",
-			TemplateDirs: DirList{Dirs: []string{"src/_layouts", "shared/templates"}},
-			DataDirs:     DirList{Dirs: []string{"shared/data"}},
-			PartialDirs:  DirList{Dirs: []string{"styles/partials"}},
+			ContentDir:         "src",
+			ContentDirPosition: Position{Line: 17, Col: 12},
+			TemplateDirs:       DirList{Dirs: []string{"src/_layouts", "shared/templates"}},
+			DataDirs:           DirList{Dirs: []string{"shared/data"}},
+			PartialDirs:        DirList{Dirs: []string{"styles/partials"}},
 		},
 		Output: Output{
-			Routing:             RoutingDirectory,
-			Dir:                 "public",
-			PassthroughPatterns: []string{"/robots.txt", ".well-known/", "*.ico"},
+			Routing: RoutingDirectory,
+			Dir:     "public",
+			PassthroughPatterns: []PassthroughPattern{
+				{Pattern: "/robots.txt", Position: Position{Line: 25, Col: 17}},
+				{Pattern: ".well-known/", Position: Position{Line: 25, Col: 30}},
+				{Pattern: "*.ico", Position: Position{Line: 25, Col: 44}},
+			},
 		},
 		Defaults: Defaults{
 			Permalink: PermalinkSlug,
@@ -720,7 +725,10 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	checkConfig(t, got, defaultConfig())
+	want := defaultConfig()
+	// True on macOS and Windows by default; see lettercase_test.go.
+	want.IgnoresLetterCase = fileSystemIgnoresCase(t, t.TempDir())
+	checkConfig(t, got, want)
 }
 
 func TestLoadMissingFile(t *testing.T) {

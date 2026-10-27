@@ -29,7 +29,7 @@ type Source struct {
 // lines, where line yamlLine of Text (counted as yaml.v3 counts lines) is.
 // Use it for a line written inside a message, such as "first at line 5".
 func (s Source) FileLine(yamlLine int) int {
-	line, _ := s.filePosition(yamlLine, 1)
+	line, _ := s.FilePosition(yamlLine, 1)
 	return line
 }
 
@@ -46,13 +46,15 @@ func (s Source) ToFilePosition(err error) error {
 		return err
 	}
 	converted := *diagErr
-	converted.Line, converted.Col = s.filePosition(diagErr.Line, diagErr.Col)
+	converted.Line, converted.Col = s.FilePosition(diagErr.Line, diagErr.Col)
 	return &converted
 }
 
-// filePosition converts line and col as yaml.v3 counts them in Text into a
-// line and column of the file. A col of 0 (unknown) stays 0.
-func (s Source) filePosition(line, col int) (fileLine, fileCol int) {
+// FilePosition converts line and col as yaml.v3 counts them in Text into a
+// line and column of the file. A col of 0 (unknown) stays 0. Use it for a
+// position kept for a later message, such as the position of a value that
+// another package checks.
+func (s Source) FilePosition(line, col int) (fileLine, fileCol int) {
 	offset := yamlOffset(s.Text, line, max(col, 1))
 	before := s.Text[:offset]
 	fileLine = bytes.Count(before, []byte("\n")) + 1 + s.LineOffset

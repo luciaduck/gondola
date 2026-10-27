@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/luciaduck/gondola/internal/diag"
 	"github.com/luciaduck/gondola/internal/frontmatter"
@@ -106,6 +107,13 @@ type Config struct {
 	Input    Input
 	Output   Output
 	Defaults Defaults
+	// IgnoresLetterCase is true when the file system of the project
+	// directory treats names that differ only in letter case as one file, as
+	// Windows and macOS do by default. It is not written in gondola.yaml:
+	// Load finds it out, and Parse leaves it false. When it is true,
+	// directories are compared ignoring case, here and in package scan, and
+	// so are passthrough patterns.
+	IgnoresLetterCase bool
 }
 
 // Settings is the config: section.
@@ -138,9 +146,12 @@ type Settings struct {
 
 // Input is the input: section.
 type Input struct {
-	ContentDir   string
-	TemplateDirs DirList
-	DataDirs     DirList
+	ContentDir string
+	// ContentDirPosition is where input.content is written, for the
+	// messages of package scan, which checks that the directory exists.
+	ContentDirPosition Position
+	TemplateDirs       DirList
+	DataDirs           DirList
 	// PartialDirs are the Sass load paths ("partials" in the Sass sense).
 	// They are never scanned for entry points.
 	PartialDirs DirList
@@ -163,8 +174,32 @@ type Output struct {
 	// Dir is the output directory. It is deleted at the start of every
 	// build.
 	Dir string
-	// PassthroughPatterns are kept as written; package scan reads them.
-	PassthroughPatterns []string
+	// PassthroughPatterns are in the order written; package scan checks
+	// and matches them.
+	PassthroughPatterns []PassthroughPattern
+}
+
+// PassthroughPattern is one entry of output.passthrough.
+type PassthroughPattern struct {
+	// Pattern is the text exactly as written.
+	Pattern string
+	// Position is where it is written, for the messages of package scan.
+	Position Position
+}
+
+// Position is where a value is written in gondola.yaml, kept for a package
+// that checks the value later. Line and Col count as package diag counts;
+// both are 0 for a value that comes from a default.
+type Position struct {
+	Line int
+	Col  int
+}
+
+// Errorf returns a *diag.Error naming gondola.yaml at p, with a message
+// formatted as by fmt.Errorf. At the zero Position the error has no line,
+// as for any error about a default value.
+func (p Position) Errorf(format string, args ...any) error {
+	return &diag.Error{File: FileName, Line: p.Line, Col: p.Col, Err: fmt.Errorf(format, args...)}
 }
 
 // TempDir returns the temp output, where a build is assembled before it is
@@ -201,31 +236,54 @@ func Load(projectDir string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("reading %s: %w", FileName, err)
 	}
-	return Parse(src)
+	return parseFile(src, ignoresLetterCase(projectDir))
+}
+
+// ignoresLetterCase reports whether the file system of projectDir ignores
+// letter case. gondola.yaml has just been read, so it exists; on such a file
+// system the same name in capitals opens the same file. Nothing is written
+// to find this out. A project that holds both gondola.yaml and GONDOLA.YAML
+// is on a file system that tells them apart, and os.SameFile says so.
+func ignoresLetterCase(projectDir string) bool {
+	written, err := os.Stat(filepath.Join(projectDir, FileName))
+	if err != nil {
+		return false
+	}
+	inCapitals, err := os.Stat(filepath.Join(projectDir, strings.ToUpper(FileName)))
+	if err != nil {
+		return false
+	}
+	return os.SameFile(written, inCapitals)
 }
 
 // Parse parses and validates the contents of gondola.yaml. Errors that point
-// at a place in the file are *diag.Error values naming FileName.
+// at a place in the file are *diag.Error values naming FileName. Directories
+// are compared by their letters exactly (IgnoresLetterCase is false); Load
+// compares them as the project's file system does.
 func Parse(src []byte) (Config, error) {
+	return parseFile(src, false)
+}
+
+func parseFile(src []byte, ignoresLetterCase bool) (Config, error) {
 	if err := sourcetext.CheckEncoding(src); err != nil {
 		return Config{}, diag.WithFile(err, FileName)
 	}
 	// yaml.v3 skips a byte order mark but counts it as a character, so it is
 	// removed first: positions never count it (package sourcetext).
 	text := sourcetext.TrimByteOrderMark(src)
-	config, err := parse(text)
+	config, err := parse(text, ignoresLetterCase)
 	if err != nil {
 		return Config{}, yamlnode.Source{Text: text}.ToFilePosition(err)
 	}
 	return config, nil
 }
 
-func parse(src []byte) (Config, error) {
+func parse(src []byte, ignoresLetterCase bool) (Config, error) {
 	root, err := parseDocument(src)
 	if err != nil {
 		return Config{}, err
 	}
-	values := newFileValues(src)
+	values := newFileValues(src, ignoresLetterCase)
 	if err := values.readRoot(root); err != nil {
 		return Config{}, err
 	}

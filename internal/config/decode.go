@@ -44,6 +44,13 @@ type locatedPath struct {
 	node *yaml.Node
 }
 
+// locatedPattern is a passthrough pattern as written and the node it was
+// read from.
+type locatedPattern struct {
+	pattern string
+	node    *yaml.Node
+}
+
 // locatedDirList is a DirList whose entries remember their nodes.
 type locatedDirList struct {
 	dirs        []locatedPath
@@ -68,17 +75,21 @@ type fileValues struct {
 	partialDirs         locatedDirList
 	outputDir           locatedPath
 	routing             Routing
-	passthroughPatterns []string
+	passthroughPatterns []locatedPattern
 	permalink           Permalink
 	variables           map[string]any
 	// source is the whole file, for the line numbers written in messages
-	// about the values of default:.
+	// about the values of default:, and for the positions kept in Config.
 	source yamlnode.Source
+	// directories compares the role directories, ignoring letter case when
+	// the project's file system does.
+	directories pathComparer
 }
 
-func newFileValues(src []byte) *fileValues {
+func newFileValues(src []byte, ignoresLetterCase bool) *fileValues {
 	return &fileValues{
-		source: yamlnode.Source{Text: src},
+		source:      yamlnode.Source{Text: src},
+		directories: pathComparer{ignoresLetterCase: ignoresLetterCase},
 		settings: Settings{
 			Description:  defaultDescription,
 			Sass:         defaultSass,
@@ -119,21 +130,43 @@ func (v *fileValues) config() Config {
 	return Config{
 		Settings: settings,
 		Input: Input{
-			ContentDir:   v.contentDir.path,
-			TemplateDirs: v.templateDirs.dirList(),
-			DataDirs:     v.dataDirs.dirList(),
-			PartialDirs:  v.partialDirs.dirList(),
+			ContentDir:         v.contentDir.path,
+			ContentDirPosition: v.position(v.contentDir.node),
+			TemplateDirs:       v.templateDirs.dirList(),
+			DataDirs:           v.dataDirs.dirList(),
+			PartialDirs:        v.partialDirs.dirList(),
 		},
 		Output: Output{
 			Routing:             v.routing,
 			Dir:                 v.outputDir.path,
-			PassthroughPatterns: append([]string{}, v.passthroughPatterns...),
+			PassthroughPatterns: v.passthroughPatternList(),
 		},
 		Defaults: Defaults{
 			Permalink: v.permalink,
 			Variables: v.variables,
 		},
+		IgnoresLetterCase: v.directories.ignoresLetterCase,
 	}
+}
+
+// passthroughPatternList returns the patterns with their positions in the
+// file. The list is never nil.
+func (v *fileValues) passthroughPatternList() []PassthroughPattern {
+	patterns := make([]PassthroughPattern, 0, len(v.passthroughPatterns))
+	for _, located := range v.passthroughPatterns {
+		patterns = append(patterns, PassthroughPattern{Pattern: located.pattern, Position: v.position(located.node)})
+	}
+	return patterns
+}
+
+// position returns where node is written, counted as package diag counts,
+// or the zero Position for a default (a nil node).
+func (v *fileValues) position(node *yaml.Node) Position {
+	if node == nil {
+		return Position{}
+	}
+	line, col := v.source.FilePosition(node.Line, node.Column)
+	return Position{Line: line, Col: col}
 }
 
 func (l locatedDirList) dirList() DirList {
@@ -585,7 +618,7 @@ func readPathItems(target *[]locatedPath, label string, sequence *yaml.Node) err
 
 // readPatternList reads output.passthrough. The patterns are kept as
 // written: package scan checks and matches them.
-func readPatternList(target *[]string, label string, item keyValue) error {
+func readPatternList(target *[]locatedPattern, label string, item keyValue) error {
 	if yamlnode.IsEmpty(item.valueNode) {
 		return nil
 	}
@@ -593,13 +626,13 @@ func readPatternList(target *[]string, label string, item keyValue) error {
 	if value.Kind != yaml.SequenceNode {
 		return errorAt(item.valueNode, "%s must be a list of patterns, not %s", label, yamlnode.Describe(item.valueNode))
 	}
-	patterns := make([]string, 0, len(value.Content))
+	patterns := make([]locatedPattern, 0, len(value.Content))
 	for _, entry := range value.Content {
 		pattern, err := listItem(label, "a pattern", entry)
 		if err != nil {
 			return err
 		}
-		patterns = append(patterns, pattern)
+		patterns = append(patterns, locatedPattern{pattern: pattern, node: entry})
 	}
 	*target = patterns
 	return nil
