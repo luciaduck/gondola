@@ -128,6 +128,42 @@ func TestTemplateNameNoun(t *testing.T) {
 	}
 }
 
+func TestCheckReserved(t *testing.T) {
+	tests := []struct {
+		key  string
+		name string
+		want string // empty when the name is not reserved
+	}{
+		// The example of SPEC §4.
+		{"site", "site", `front matter key "site" is reserved by Gondola (templates use it for the site settings); please rename it`},
+		{"copy", "copy", `front matter key "copy" is reserved by Gondola (templates use it for the page's HTML); please rename it`},
+		{"data", "data", `front matter key "data" is reserved by Gondola (templates use it for the data files); please rename it`},
+		{"fleet", "fleet", `front matter key "fleet" is reserved by Gondola (templates use it for the collection of all pages); please rename it`},
+		{"collections", "collections", `front matter key "collections" is reserved by Gondola (templates use it for the collections of tagged pages); please rename it`},
+		{"page", "page", `front matter key "page" is reserved by Gondola (templates use it for the page's URL and metadata); please rename it`},
+		// A key that only becomes a reserved name says so.
+		{"Site", "site", `front matter key "Site" becomes "site" in templates, which is reserved by Gondola (templates use it for the site settings); please rename it`},
+		// Names that only contain a reserved word are fine.
+		{"site-name", "siteName", ""},
+		{"pages", "pages", ""},
+		{"content", "content", ""},
+	}
+	for _, test := range tests {
+		t.Run(test.key, func(t *testing.T) {
+			err := CheckReserved(test.key, test.name, "front matter key")
+			if test.want == "" {
+				if err != nil {
+					t.Fatalf("CheckReserved(%q, %q) returned error: %v", test.key, test.name, err)
+				}
+				return
+			}
+			if err == nil || err.Error() != test.want {
+				t.Errorf("error:\n got %v\nwant %s", err, test.want)
+			}
+		})
+	}
+}
+
 func TestScope(t *testing.T) {
 	tests := []struct {
 		name    string

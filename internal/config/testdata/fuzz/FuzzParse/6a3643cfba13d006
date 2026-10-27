@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("config:\n  site-name: !0\n  version: 0\n  canonical-url: http://ݶ")

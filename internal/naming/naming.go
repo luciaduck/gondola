@@ -27,6 +27,33 @@ var jetKeywords = map[string]bool{
 	"true": true, "false": true,
 }
 
+// reservedPurposes maps the template variables that Gondola itself defines to
+// what templates use them for, as the error message explains it. A front
+// matter key or a default: key with one of these names would hide Gondola's
+// variable.
+var reservedPurposes = map[string]string{
+	"copy":        "the page's HTML",
+	"site":        "the site settings",
+	"data":        "the data files",
+	"fleet":       "the collection of all pages",
+	"collections": "the collections of tagged pages",
+	"page":        "the page's URL and metadata",
+}
+
+// CheckReserved returns an error if name, the template name of key, is one
+// of the variables that Gondola reserves for itself (copy, site, data, fleet,
+// collections, page). noun is used as for TemplateName.
+func CheckReserved(key, name, noun string) error {
+	purpose, reserved := reservedPurposes[name]
+	if !reserved {
+		return nil
+	}
+	if name == key {
+		return fmt.Errorf("%s %q is reserved by Gondola (templates use it for %s); please rename it", noun, key, purpose)
+	}
+	return fmt.Errorf("%s %q becomes %q in templates, which is reserved by Gondola (templates use it for %s); please rename it", noun, key, name, purpose)
+}
+
 // TemplateName converts key to the name templates use for it and checks that
 // the name is a valid, non-keyword Jet identifier.
 //
