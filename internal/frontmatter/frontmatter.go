@@ -13,6 +13,7 @@ import (
 	"bytes"
 
 	"github.com/luciaduck/gondola/internal/diag"
+	"github.com/luciaduck/gondola/internal/sourcetext"
 	"github.com/luciaduck/gondola/internal/yamlnode"
 )
 
@@ -23,9 +24,6 @@ const delimiter = "---"
 // spaces and tabs that an editor left behind, and the "\r" of a CRLF line
 // ending.
 const delimiterTrailingSpace = " \t\r"
-
-// utf8ByteOrderMark may start a UTF-8 file; it is not part of the text.
-var utf8ByteOrderMark = []byte("\xEF\xBB\xBF")
 
 // unterminatedMessage is the error for a block that is opened but never
 // closed. Without it, the whole file would silently become the body.
@@ -61,10 +59,10 @@ func Split(file string, src []byte) (Document, error) {
 }
 
 func split(src []byte) (Document, error) {
-	if err := yamlnode.CheckEncoding(src); err != nil {
+	if err := sourcetext.CheckEncoding(src); err != nil {
 		return Document{}, err
 	}
-	text := bytes.TrimPrefix(src, utf8ByteOrderMark)
+	text := sourcetext.TrimByteOrderMark(src)
 	block, body, found := cutBlock(text)
 	if !found {
 		return Document{Variables: map[string]any{}, Body: text}, nil

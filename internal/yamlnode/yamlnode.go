@@ -1,41 +1,18 @@
 // Package yamlnode holds what Gondola's YAML readers share (gondola.yaml,
-// front matter, and later the data files): the encoding check, the rule for
-// empty values, the conversion of yaml.v3's positions and errors to
-// positions in the file, and the decoding of free-form values.
+// front matter, and later the data files): the rule for empty values, the
+// conversion of yaml.v3's positions and errors to positions in the file, and
+// the decoding of free-form values. The encoding check is in sourcetext,
+// because files that are not YAML need it too.
 //
 // Gondola reads YAML as yaml.Node trees instead of decoding it into Go
 // values directly, so that every error can point at line and column.
 package yamlnode
 
 import (
-	"bytes"
 	"strconv"
 
-	"github.com/luciaduck/gondola/internal/diag"
 	"gopkg.in/yaml.v3"
 )
-
-// utf16ByteOrderMarks start a file saved as UTF-16, little-endian and
-// big-endian. Windows PowerShell 5.1 writes such files by default.
-var utf16ByteOrderMarks = [][]byte{{0xFF, 0xFE}, {0xFE, 0xFF}}
-
-// UTF16Message is the error for a file saved as UTF-16. It has no position:
-// the console could not print a line of such a file.
-const UTF16Message = "the file is saved as UTF-16; please save it as UTF-8"
-
-// CheckEncoding returns a *diag.Error without a file name if src starts with
-// a UTF-16 byte order mark. yaml.v3 would read UTF-16, but the positions in
-// its errors would count the decoded text, not the bytes of the file, and
-// every other source file Gondola reads is UTF-8. A UTF-8 byte order mark is
-// fine.
-func CheckEncoding(src []byte) error {
-	for _, byteOrderMark := range utf16ByteOrderMarks {
-		if bytes.HasPrefix(src, byteOrderMark) {
-			return &diag.Error{Msg: UTF16Message}
-		}
-	}
-	return nil
-}
 
 // Resolved returns the node that an alias (*name) points to, or node itself.
 // Positions are still taken from the alias, which is where the user wrote

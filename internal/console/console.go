@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/luciaduck/gondola/internal/diag"
+	"github.com/luciaduck/gondola/internal/sourcetext"
 )
 
 // ANSI escape sequences, written by hand. Only cyan and red are used;
@@ -170,6 +171,8 @@ func (p *Printer) readLine(file string, lineNumber int) (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	// Columns do not count a byte order mark, so it is not printed either.
+	content = sourcetext.TrimByteOrderMark(content)
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 	// A line can be longer than bufio.Scanner's default limit of 64 KiB;
 	// the whole file is already in memory, so allow up to its size.

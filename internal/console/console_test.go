@@ -36,6 +36,7 @@ func TestError(t *testing.T) {
 		"accents.md":         {Data: []byte("perché è ?x[\n")},
 		"no-newline.md":      {Data: []byte("first\nlast")},
 		"long.md":            {Data: manyLines(123456)},
+		"bom.md":             {Data: []byte("\xEF\xBB\xBF::: +note ?x[\nsecond\n")},
 	}
 	tests := []struct {
 		name string
@@ -99,6 +100,22 @@ func TestError(t *testing.T) {
 			want: "error: accents.md:1:13: bad\n" +
 				"    1 | perché è ?x[\n" +
 				"      |           ^\n",
+		},
+		{
+			// Columns do not count a byte order mark (package sourcetext),
+			// and the mark is not printed.
+			name: "byte order mark on line 1 is not printed",
+			err:  &diag.Error{File: "bom.md", Line: 1, Col: 11, Msg: "bad"},
+			want: "error: bom.md:1:11: bad\n" +
+				"    1 | ::: +note ?x[\n" +
+				"      |           ^\n",
+		},
+		{
+			name: "byte order mark does not change line 2",
+			err:  &diag.Error{File: "bom.md", Line: 2, Col: 2, Msg: "bad"},
+			want: "error: bom.md:2:2: bad\n" +
+				"    2 | second\n" +
+				"      |  ^\n",
 		},
 		{
 			name: "last line without a final newline",

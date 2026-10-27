@@ -799,3 +799,27 @@ func TestParseAcceptsUTF8ByteOrderMark(t *testing.T) {
 	const utf8ByteOrderMark = string(rune(0xFEFF))
 	checkConfig(t, mustParse(t, utf8ByteOrderMark+minimal), defaultConfig())
 }
+
+// TestParseByteOrderMarkPositions checks that columns on line 1 do not count
+// a byte order mark. yaml.v3 counts it as one character, which once moved
+// the column 2 bytes to the right.
+func TestParseByteOrderMarkPositions(t *testing.T) {
+	const utf8ByteOrderMark = string(rune(0xFEFF))
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"line 1", utf8ByteOrderMark + "config: [1]\n", "gondola.yaml:1:9: config must be a map of keys, not a list"},
+		{"line 1 without the mark", "config: [1]\n", "gondola.yaml:1:9: config must be a map of keys, not a list"},
+		{"line 2", utf8ByteOrderMark + "config:\n  sass: yes\n", `gondola.yaml:2:9: config.sass must be true or false, not "yes"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Parse([]byte(test.src))
+			if err == nil || err.Error() != test.want {
+				t.Errorf("error:\n got %v\nwant %s", err, test.want)
+			}
+		})
+	}
+}

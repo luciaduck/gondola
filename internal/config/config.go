@@ -12,6 +12,7 @@ import (
 
 	"github.com/luciaduck/gondola/internal/diag"
 	"github.com/luciaduck/gondola/internal/frontmatter"
+	"github.com/luciaduck/gondola/internal/sourcetext"
 	"github.com/luciaduck/gondola/internal/yamlnode"
 )
 
@@ -206,17 +207,20 @@ func Load(projectDir string) (Config, error) {
 // Parse parses and validates the contents of gondola.yaml. Errors that point
 // at a place in the file are *diag.Error values naming FileName.
 func Parse(src []byte) (Config, error) {
-	config, err := parse(src)
+	if err := sourcetext.CheckEncoding(src); err != nil {
+		return Config{}, diag.WithFile(err, FileName)
+	}
+	// yaml.v3 skips a byte order mark but counts it as a character, so it is
+	// removed first: positions never count it (package sourcetext).
+	text := sourcetext.TrimByteOrderMark(src)
+	config, err := parse(text)
 	if err != nil {
-		return Config{}, yamlnode.Source{Text: src}.ToFilePosition(err)
+		return Config{}, yamlnode.Source{Text: text}.ToFilePosition(err)
 	}
 	return config, nil
 }
 
 func parse(src []byte) (Config, error) {
-	if err := yamlnode.CheckEncoding(src); err != nil {
-		return Config{}, diag.WithFile(err, FileName)
-	}
 	root, err := parseDocument(src)
 	if err != nil {
 		return Config{}, err
