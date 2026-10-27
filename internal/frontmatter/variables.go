@@ -126,7 +126,8 @@ func readVariables(source yamlnode.Source) (map[string]any, error) {
 //
 //   - An empty value (null, ~, nothing, "", or a tag with no text) is "".
 //   - layout, title, author and permalink are text, kept exactly as written
-//     (title: 0.10 is "0.10"). A tag on the text is ignored.
+//     (title: 0.10 is "0.10"). A tag on the text is ignored. permalink is
+//     also checked with the rules of CheckPermalink.
 //   - sitemap and excludeFromFleet are YAML booleans.
 //   - tags is one tag or a list of tags, and becomes a []string. Tags are
 //     trimmed; an empty tag, a tag listed twice and the tag "fleet" are
@@ -142,8 +143,10 @@ func ReadValue(name string, key Key, node *yaml.Node, source yamlnode.Source) (a
 		return "", nil
 	}
 	switch name {
-	case layoutKey, titleKey, authorKey, permalinkKey:
+	case layoutKey, titleKey, authorKey:
 		return readText(key, node)
+	case permalinkKey:
+		return readPermalink(key, node)
 	case sitemapKey, excludeFromFleetKey:
 		return readBool(key, node)
 	case tagsKey:
@@ -161,6 +164,20 @@ func readText(key Key, node *yaml.Node) (string, error) {
 	}
 	// Value is the text as written, so 0.10 stays "0.10".
 	return value.Value, nil
+}
+
+// readPermalink reads text and checks it with the rules of CheckPermalink.
+// default.permalink never comes here: package config accepts only the three
+// choices there.
+func readPermalink(key Key, node *yaml.Node) (string, error) {
+	permalink, err := readText(key, node)
+	if err != nil {
+		return "", err
+	}
+	if err := checkPermalink(key.valueLabel(), permalink); err != nil {
+		return "", yamlnode.WrapAt(node, err)
+	}
+	return permalink, nil
 }
 
 func readBool(key Key, node *yaml.Node) (bool, error) {

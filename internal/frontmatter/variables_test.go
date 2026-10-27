@@ -34,6 +34,9 @@ func TestVariables(t *testing.T) {
 		{"empty special keys", "title:\ntags: ~\ndate: \"\"\nsitemap:\nlayout: ''\n", map[string]any{"title": "", "tags": "", "date": "", "sitemap": "", "layout": ""}},
 		{"text kept as written", "title: 0.10\nauthor: 2024\npermalink: /a/\nlayout: nil\n", map[string]any{"title": "0.10", "author": "2024", "permalink": "/a/", "layout": "nil"}},
 		{"tag on text is ignored", "title: !fancy Home\n", map[string]any{"title": "Home"}},
+		{"permalink choice", "permalink: slug\n", map[string]any{"permalink": "slug"}},
+		{"custom permalink kept as written", "permalink: /Città/My page.html\n", map[string]any{"permalink": "/Città/My page.html"}},
+		{"custom permalink to be cleaned", "permalink: //a/./b/\n", map[string]any{"permalink": "//a/./b/"}},
 		{"multi-line title", "title: |\n  Two\n  lines\n", map[string]any{"title": "Two\nlines\n"}},
 		{"alias", "base: &t Home\ntitle: *t\n", map[string]any{"base": "Home", "title": "Home"}},
 		{"booleans", "sitemap: false\nexcludeFromFleet: True\n", map[string]any{"sitemap": false, "excludeFromFleet": true}},
@@ -113,6 +116,18 @@ func TestVariablesErrors(t *testing.T) {
 		{"author map", "author: {name: Lucia}\n", `2:9: front matter key "author" must be text, not a map`},
 		{"permalink list", "permalink:\n  - /a/\n", `3:3: front matter key "permalink" must be text, not a list`},
 		{"layout map", "layout: {a: 1}\n", `2:9: front matter key "layout" must be text, not a map`},
+		// Permalinks (SPEC §5.7).
+		{"permalink without slash", "permalink: about-us/\n", `2:12: permalink "about-us/" must be "path", "slug" or "date", or a path that begins with "/"`},
+		{"permalink choice in capitals", "permalink: Slug\n", `2:12: permalink "Slug" must be "path", "slug" or "date", or a path that begins with "/"`},
+		{"permalink named as written", "Permalink: x\n", `2:12: Permalink "x" must be "path", "slug" or "date", or a path that begins with "/"`},
+		{"permalink number", "permalink: 2024\n", `2:12: permalink "2024" must be "path", "slug" or "date", or a path that begins with "/"`},
+		{"permalink with dot dot", "permalink: /a/../b/\n", `2:12: permalink "/a/../b/" is not allowed: permalinks may not contain ".." (they must stay inside the output directory)`},
+		{"permalink with backslash", "permalink: /a\\b.html\n", `2:12: permalink "/a\\b.html" contains "\\"; please separate directories with "/"`},
+		{"permalink with colon", "permalink: \"/a:b.html\"\n", `2:12: permalink "/a:b.html" contains ":"; Windows does not allow it in file names; please remove it`},
+		{"permalink with query", "permalink: /feed?x=1\n", `2:12: permalink "/feed?x=1" contains "?"; a permalink names a file in the output, so it cannot have a query (the part after "?")`},
+		// In double quotes, \x8d is a YAML escape for U+008D, which is UTF-8.
+		{"permalink with YAML escape", "permalink: \"/a\\x8d\"\n", `2:12: permalink "/a\u008d" contains a control character (U+008D); please remove it`},
+		{"permalink with tab", "permalink: \"/a\\tb/\"\n", `2:12: permalink "/a\tb/" contains a control character (U+0009); please remove it`},
 		// Booleans.
 		{"sitemap yes", "sitemap: yes\n", `2:10: front matter key "sitemap" must be true or false, not "yes"`},
 		{"sitemap quoted", "sitemap: \"true\"\n", `2:10: front matter key "sitemap" must be true or false, not "true"`},
@@ -175,5 +190,16 @@ func TestVariablesErrorPositions(t *testing.T) {
 				t.Errorf("error:\n got %v\nwant %s", err, want)
 			}
 		})
+	}
+}
+
+func TestVariablesNotUTF8(t *testing.T) {
+	// yaml.v3 refuses a byte that is not UTF-8 before any value is read, so
+	// CheckPermalink never sees one from front matter. Its message has no
+	// line.
+	_, err := Split(testFile, []byte("---\npermalink: /a\x8d\n---\n"))
+	want := testFile + ": invalid YAML: invalid leading UTF-8 octet"
+	if err == nil || err.Error() != want {
+		t.Errorf("error:\n got %v\nwant %s", err, want)
 	}
 }

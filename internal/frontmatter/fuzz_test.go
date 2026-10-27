@@ -32,6 +32,8 @@ func FuzzSplit(f *testing.F) {
 		"---\na: 1\n...\n--- x\n---\n",
 		"\xFF\xFE-\x00",
 		"---\nupdated: 2024-05-01T10:00:00+02:00\n---\n",
+		"---\npermalink: /a/../b:c\\d\n---\n",
+		"---\npermalink: \"/x\\u0085\"\n---\n",
 	}
 	for _, seed := range seeds {
 		f.Add([]byte(seed))

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/luciaduck/gondola/internal/config"
 )
@@ -220,6 +221,9 @@ func (w *walker) visitDir(levels []string, inPageArea bool) error {
 func (w *walker) visitFile(levels []string, inPageArea bool) error {
 	sourcePath := slashPath(levels)
 	if w.passesThrough(levels) {
+		if err := checkNameEncoding(levels); err != nil {
+			return err
+		}
 		if err := w.outputPaths.Claim(sourcePath, PassthroughSource, sourcePath); err != nil {
 			return err
 		}
@@ -228,6 +232,11 @@ func (w *walker) visitFile(levels []string, inPageArea bool) error {
 	}
 	if !inPageArea {
 		return nil
+	}
+	if w.isSourceExtension(sourcePath) {
+		if err := checkNameEncoding(levels); err != nil {
+			return err
+		}
 	}
 	contentPath := slashPath(levels[len(w.contentLevels):])
 	extension := strings.ToLower(path.Ext(sourcePath))
@@ -269,6 +278,44 @@ func (w *walker) checkLink(levels []string, inPageArea bool) error {
 		return fmt.Errorf("%s is a symbolic link; Gondola does not follow links, so please replace it with the file or directory itself", sourcePath)
 	}
 	return nil
+}
+
+// checkNameEncoding refuses a file that Gondola would use when its name, or
+// the name of a directory above it, is not valid UTF-8. Linux allows such
+// names (an old file named in Latin-1, for example), but the console, URLs
+// and the sitemap are UTF-8, and Windows and macOS could not hold the file
+// at all. A file that would be ignored anyway is left alone, as links are.
+func checkNameEncoding(levels []string) error {
+	for i, name := range levels {
+		if utf8.ValidString(name) {
+			continue
+		}
+		sourcePath := escapeInvalidUTF8(slashPath(levels))
+		if i == len(levels)-1 {
+			return fmt.Errorf("%s: the file name is not valid UTF-8; please rename it", sourcePath)
+		}
+		return fmt.Errorf("%s: the name of the directory %q is not valid UTF-8; please rename it", sourcePath, name)
+	}
+	return nil
+}
+
+// escapeInvalidUTF8 writes each byte of text that is not part of valid UTF-8
+// as \xNN, as %q does, so a message shows "caf\xe9.md" instead of a
+// replacement character; the rest of text is kept as it is.
+func escapeInvalidUTF8(text string) string {
+	var escaped strings.Builder
+	for len(text) > 0 {
+		character, size := utf8.DecodeRuneInString(text)
+		// DecodeRuneInString returns RuneError with size 1 for a byte that
+		// is not valid UTF-8; a real U+FFFD in the text has size 3.
+		if character == utf8.RuneError && size == 1 {
+			fmt.Fprintf(&escaped, "\\x%02x", text[0])
+		} else {
+			escaped.WriteString(text[:size])
+		}
+		text = text[size:]
+	}
+	return escaped.String()
 }
 
 // isSourceExtension reports whether a file with this name would be a page

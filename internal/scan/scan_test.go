@@ -508,3 +508,54 @@ func TestScanEntersOnlyNeededDirectories(t *testing.T) {
 		t.Errorf("error = %v, want one about reading .git", err)
 	}
 }
+
+// skipUnlessNamesMayBeAnyBytes skips the test on a file system that refuses
+// file names that are not valid UTF-8, as APFS on macOS and NTFS do.
+func skipUnlessNamesMayBeAnyBytes(t *testing.T) {
+	t.Helper()
+	probe := filepath.Join(t.TempDir(), "caf\xe9")
+	if err := os.WriteFile(probe, nil, 0o644); err != nil {
+		t.Skipf("the file system refuses names that are not UTF-8: %v", err)
+	}
+}
+
+func TestScanNamesNotUTF8(t *testing.T) {
+	skipUnlessNamesMayBeAnyBytes(t)
+	// "caf\xe9" is "café" in Latin-1: the byte 0xE9 alone is not UTF-8.
+	const notUTF8 = ": the file name is not valid UTF-8; please rename it"
+	runScanErrorTests(t, []scanErrorTest{
+		{"page", "", []string{"index.md", "caf\xe9.md"}, `caf\xe9.md` + notUTF8},
+		{"HTML page", "", []string{"caf\xe9.HTML"}, `caf\xe9.HTML` + notUTF8},
+		{"Sass entry point", "", []string{"style/caf\xe9.scss"}, `style/caf\xe9.scss` + notUTF8},
+		{"passthrough file", "output:\n  passthrough: [static/]\n", []string{"static/caf\xe9.png"}, `static/caf\xe9.png` + notUTF8},
+		{"passthrough file in a skipped directory", "output:\n  passthrough: [.well-known/]\n", []string{".well-known/caf\xe9"}, `.well-known/caf\xe9` + notUTF8},
+		{"several bytes", "", []string{"a\xff\xfeb.md"}, `a\xff\xfeb.md` + notUTF8},
+		{"directory", "", []string{"caf\xe9/post.md"},
+			`caf\xe9/post.md: the name of the directory "caf\xe9" is not valid UTF-8; please rename it`},
+		{"directory and file", "", []string{"caf\xe9/caf\xe9.md"},
+			`caf\xe9/caf\xe9.md: the name of the directory "caf\xe9" is not valid UTF-8; please rename it`},
+	})
+	// Files that Gondola would ignore anyway are left alone. A real U+FFFD
+	// in a name is valid UTF-8.
+	runScanTests(t, []scanTest{
+		{"ignored files", "", []string{"caf\xe9.txt", "caf\xe9.jet", "_drafts/caf\xe9.md", ".git/caf\xe9.md", "caf\xe9/notes.txt", "a\uFFFD.md"},
+			[]string{"markdown a\uFFFD.md as a\uFFFD.md"}},
+	})
+}
+
+func TestEscapeInvalidUTF8(t *testing.T) {
+	tests := []struct{ text, want string }{
+		{"", ""},
+		{"café/città.md", "café/città.md"},
+		{"caf\xe9.md", `caf\xe9.md`},
+		{"\xff", `\xff`},
+		{"a\xe2\x82b", `a\xe2\x82b`}, // the start of "€" without its last byte
+		{"\uFFFD", "\uFFFD"},
+		{`a"b\c`, `a"b\c`},
+	}
+	for _, test := range tests {
+		if got := escapeInvalidUTF8(test.text); got != test.want {
+			t.Errorf("escapeInvalidUTF8(%q) = %q, want %q", test.text, got, test.want)
+		}
+	}
+}

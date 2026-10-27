@@ -47,14 +47,15 @@ const (
 // so they are not a Permalink.
 type Permalink string
 
-// The values of default.permalink.
+// The values of default.permalink. The words are defined by package
+// frontmatter, because a page's front matter accepts them too.
 const (
 	// PermalinkPath keeps the source path.
-	PermalinkPath Permalink = "path"
+	PermalinkPath Permalink = frontmatter.PermalinkPath
 	// PermalinkSlug names the file after the slug of the title.
-	PermalinkSlug Permalink = "slug"
+	PermalinkSlug Permalink = frontmatter.PermalinkSlug
 	// PermalinkDate builds /YYYY/MM/DD/<slug> from the date and the title.
-	PermalinkDate Permalink = "date"
+	PermalinkDate Permalink = frontmatter.PermalinkDate
 )
 
 // Engine names a template engine.
