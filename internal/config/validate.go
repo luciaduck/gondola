@@ -13,7 +13,26 @@ func (v *fileValues) validate() error {
 	if v.settings.FencedBlocks && !v.settings.Markdown {
 		return errorAt(v.fencedBlocksNode, "config.fenced-blocks is true but config.markdown is false; fenced blocks only work in Markdown pages")
 	}
-	return v.checkDirectories()
+	if err := v.checkDirectories(); err != nil {
+		return err
+	}
+	return v.checkDataDirsApart()
+}
+
+// checkDataDirsApart refuses a data directory inside another one: package
+// data would load every file in it twice, under two keys. Two entries that
+// are the same directory only when letter case is ignored are left to
+// package data, which reports each file that becomes the same key.
+func (v *fileValues) checkDataDirsApart() error {
+	dirs := v.dataDirs.dirs
+	for _, inner := range dirs {
+		for _, outer := range dirs {
+			if v.directories.isWithin(inner.path, outer.path) && !v.directories.equal(inner.path, outer.path) {
+				return errorAt(inner.node, "input.data %q is inside input.data %q; please list only one", inner.path, outer.path)
+			}
+		}
+	}
+	return nil
 }
 
 // roleDir is a role directory with the words that name it in messages.

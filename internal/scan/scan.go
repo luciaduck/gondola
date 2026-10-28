@@ -221,7 +221,7 @@ func (w *walker) visitDir(levels []string, inPageArea bool) error {
 func (w *walker) visitFile(levels []string, inPageArea bool) error {
 	sourcePath := slashPath(levels)
 	if w.passesThrough(levels) {
-		if err := checkNameEncoding(levels); err != nil {
+		if err := CheckNameEncoding(levels, false); err != nil {
 			return err
 		}
 		if err := w.outputPaths.Claim(sourcePath, PassthroughSource, sourcePath); err != nil {
@@ -234,7 +234,7 @@ func (w *walker) visitFile(levels []string, inPageArea bool) error {
 		return nil
 	}
 	if w.isSourceExtension(sourcePath) {
-		if err := checkNameEncoding(levels); err != nil {
+		if err := CheckNameEncoding(levels, false); err != nil {
 			return err
 		}
 	}
@@ -275,23 +275,33 @@ func (w *walker) checkLink(levels []string, inPageArea bool) error {
 		used = w.passesThrough(levels) || inPageArea && w.isSourceExtension(sourcePath)
 	}
 	if used {
-		return fmt.Errorf("%s is a symbolic link; Gondola does not follow links, so please replace it with the file or directory itself", sourcePath)
+		return LinkError(sourcePath)
 	}
 	return nil
 }
 
-// checkNameEncoding refuses a file that Gondola would use when its name, or
-// the name of a directory above it, is not valid UTF-8. Linux allows such
+// LinkError is the error for a symbolic link at sourcePath (relative to the
+// project root, with "/") that Gondola would use. Package data refuses
+// links in the data directories with it too.
+func LinkError(sourcePath string) error {
+	return fmt.Errorf("%s is a symbolic link; Gondola does not follow links, so please replace it with the file or directory itself", sourcePath)
+}
+
+// CheckNameEncoding refuses a file that Gondola would use when its name, or
+// the name of a directory above it, is not valid UTF-8. levels are the
+// names on the path from the project root to the file; lastIsDirectory says
+// that the last one is a directory that Gondola uses itself, as package data
+// does with the directories that become keys. Linux allows such
 // names (an old file named in Latin-1, for example), but the console, URLs
 // and the sitemap are UTF-8, and Windows and macOS could not hold the file
 // at all. A file that would be ignored anyway is left alone, as links are.
-func checkNameEncoding(levels []string) error {
+func CheckNameEncoding(levels []string, lastIsDirectory bool) error {
 	for i, name := range levels {
 		if utf8.ValidString(name) {
 			continue
 		}
 		sourcePath := escapeInvalidUTF8(slashPath(levels))
-		if i == len(levels)-1 {
+		if i == len(levels)-1 && !lastIsDirectory {
 			return fmt.Errorf("%s: the file name is not valid UTF-8; please rename it", sourcePath)
 		}
 		return fmt.Errorf("%s: the name of the directory %q is not valid UTF-8; please rename it", sourcePath, name)

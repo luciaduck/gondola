@@ -49,7 +49,9 @@ func defaultConfig() Config {
 			ContentDir:   ".",
 			TemplateDirs: DirList{Dirs: []string{"_components/includes"}, FromDefault: true},
 			DataDirs:     DirList{Dirs: []string{"_data"}, FromDefault: true},
-			PartialDirs:  DirList{Dirs: []string{"_components/sass"}, FromDefault: true},
+			// The default has no position.
+			DataDirPositions: []Position{{}},
+			PartialDirs:      DirList{Dirs: []string{"_components/sass"}, FromDefault: true},
 		},
 		Output: Output{
 			Routing:             RoutingFile,
@@ -145,6 +147,7 @@ default:
 			ContentDirPosition: Position{Line: 17, Col: 12},
 			TemplateDirs:       DirList{Dirs: []string{"src/_layouts", "shared/templates"}},
 			DataDirs:           DirList{Dirs: []string{"shared/data"}},
+			DataDirPositions:   []Position{{Line: 19, Col: 9}},
 			PartialDirs:        DirList{Dirs: []string{"styles/partials"}},
 		},
 		Output: Output{
@@ -237,12 +240,18 @@ func TestParseRealValuesAreKept(t *testing.T) {
 		}},
 		{"empty data list", "input:\n  data: []\n", func(c *Config) {
 			c.Input.DataDirs = DirList{Dirs: []string{}}
+			c.Input.DataDirPositions = []Position{}
 		}},
 		{"empty partials list", "input:\n  partials: []\n", func(c *Config) {
 			c.Input.PartialDirs = DirList{Dirs: []string{}}
 		}},
 		{"default dir written by hand", "input:\n  data: _data\n", func(c *Config) {
 			c.Input.DataDirs = DirList{Dirs: []string{"_data"}}
+			c.Input.DataDirPositions = []Position{{Line: 6, Col: 9}}
+		}},
+		{"data dirs that share a prefix are apart", "input:\n  data: [_data, _data-extra]\n", func(c *Config) {
+			c.Input.DataDirs = DirList{Dirs: []string{"_data", "_data-extra"}}
+			c.Input.DataDirPositions = []Position{{Line: 6, Col: 10}, {Line: 6, Col: 17}}
 		}},
 		{"empty plugin list", "  plugin: []\n", func(*Config) {}},
 		{"empty passthrough list", "output:\n  passthrough: []\n", func(*Config) {}},
@@ -624,6 +633,12 @@ func TestParseErrors(t *testing.T) {
 			`gondola.yaml:6:12: output.directory "_site" (the default) contains the content directory "_site/src"; role directories may be inside it but must not be it or contain it`},
 		{"temp is content", withMinimal("input:\n  content: _site.temp\n"),
 			`gondola.yaml:6:12: the temp directory "_site.temp" is the content directory; role directories may be inside it but must not be it or contain it`},
+
+		// A data directory inside another one would load its files twice.
+		{"data dir inside the next one", withMinimal("input:\n  data: [_data/authors, _data]\n"),
+			`gondola.yaml:6:10: input.data "_data/authors" is inside input.data "_data"; please list only one`},
+		{"data dir inside the previous one", withMinimal("input:\n  data:\n    - shared\n    - local\n    - shared/blog/authors\n"),
+			`gondola.yaml:9:7: input.data "shared/blog/authors" is inside input.data "shared"; please list only one`},
 
 		// The directories a build deletes.
 		{"output is data", withMinimal("output:\n  directory: _data\n"),

@@ -134,6 +134,7 @@ func (v *fileValues) config() Config {
 			ContentDirPosition: v.position(v.contentDir.node),
 			TemplateDirs:       v.templateDirs.dirList(),
 			DataDirs:           v.dataDirs.dirList(),
+			DataDirPositions:   v.positions(v.dataDirs.dirs),
 			PartialDirs:        v.partialDirs.dirList(),
 		},
 		Output: Output{
@@ -167,6 +168,16 @@ func (v *fileValues) position(node *yaml.Node) Position {
 	}
 	line, col := v.source.FilePosition(node.Line, node.Column)
 	return Position{Line: line, Col: col}
+}
+
+// positions returns where each of located is written, at the same indexes.
+// The list is never nil.
+func (v *fileValues) positions(located []locatedPath) []Position {
+	result := make([]Position, 0, len(located))
+	for _, entry := range located {
+		result = append(result, v.position(entry.node))
+	}
+	return result
 }
 
 func (l locatedDirList) dirList() DirList {
