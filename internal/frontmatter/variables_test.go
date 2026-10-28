@@ -26,7 +26,7 @@ func TestVariables(t *testing.T) {
 	}{
 		{"names are converted", "og-image: /a.png\nexclude_from_fleet: true\n", map[string]any{"ogImage": "/a.png", "excludeFromFleet": true}},
 		{"user values keep their types", "count: 3\nratio: 0.5\ndraft: false\nlist: [a, 2]\n", map[string]any{"count": 3, "ratio": 0.5, "draft": false, "list": []any{"a", 2}}},
-		{"real values are kept", "count: 0\ndraft: false\nlist: []\nmap: {}\n", map[string]any{"count": 0, "draft": false, "list": []any{}, "map": map[string]any{}}},
+		{"real values are kept", "count: 0\ndraft: false\nlist: []\nsettings: {}\n", map[string]any{"count": 0, "draft": false, "list": []any{}, "settings": map[string]any{}}},
 		{"nested map", "social:\n  first-name: Lucia\n  links: {site: x}\n", map[string]any{"social": map[string]any{"first-name": "Lucia", "links": map[string]any{"site": "x"}}}},
 		{"nested number keys become text", "counts: {1: one, 2.50: two}\n", map[string]any{"counts": map[string]any{"1": "one", "2.50": "two"}}},
 		{"unquoted date under a user key", "updated: 2024-05-01\n", map[string]any{"updated": may1}},
@@ -110,12 +110,19 @@ func TestVariablesErrors(t *testing.T) {
 		{"reserved collections", "collections: x\n", `2:1: front matter key "collections" is reserved by Gondola (templates use it for the collections of tagged pages); please rename it`},
 		{"reserved page", "page: x\n", `2:1: front matter key "page" is reserved by Gondola (templates use it for the page's URL and metadata); please rename it`},
 		{"becomes reserved", "Site: x\n", `2:1: front matter key "Site" becomes "site" in templates, which is reserved by Gondola (templates use it for the site settings); please rename it`},
+		{"Jet function", "raw: true\n", `2:1: front matter key "raw" is the name of a Jet function and cannot be a template variable; please rename it`},
+		{"becomes a Jet function", "Raw: 1\n", `2:1: front matter key "Raw" becomes "raw" in templates, which is the name of a Jet function; please rename it`},
 		{"reserved even when empty", "page:\n", `2:1: front matter key "page" is reserved by Gondola (templates use it for the page's URL and metadata); please rename it`},
 		// Text keys.
 		{"title list", "title: [a]\n", `2:8: front matter key "title" must be text, not a list`},
 		{"author map", "author: {name: Lucia}\n", `2:9: front matter key "author" must be text, not a map`},
 		{"permalink list", "permalink:\n  - /a/\n", `3:3: front matter key "permalink" must be text, not a list`},
 		{"layout map", "layout: {a: 1}\n", `2:9: front matter key "layout" must be text, not a map`},
+		// Layout names (SPEC §5.11).
+		{"layout with dot dot", "layout: ../base\n", `2:9: layout "../base" is not allowed: layout names are relative to the template directories and may not contain ".." or be absolute`},
+		{"layout absolute", "layout: /base\n", `2:9: layout "/base" is not allowed: layout names are relative to the template directories and may not contain ".." or be absolute`},
+		{"layout named as written", "Layout: ./base\n", `2:9: Layout "./base" has an empty or "." part; please write it as a path such as "page" or "blog/post"`},
+		{"layout with backslash", "layout: a\\b\n", `2:9: layout "a\\b" contains "\\"; please separate directories with "/"`},
 		// Permalinks (SPEC §5.7).
 		{"permalink without slash", "permalink: about-us/\n", `2:12: permalink "about-us/" must be "path", "slug" or "date", or a path that begins with "/"`},
 		{"permalink choice in capitals", "permalink: Slug\n", `2:12: permalink "Slug" must be "path", "slug" or "date", or a path that begins with "/"`},

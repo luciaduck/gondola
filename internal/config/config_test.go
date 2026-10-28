@@ -49,9 +49,10 @@ func defaultConfig() Config {
 			ContentDir:   ".",
 			TemplateDirs: DirList{Dirs: []string{"_components/includes"}, FromDefault: true},
 			DataDirs:     DirList{Dirs: []string{"_data"}, FromDefault: true},
-			// The default has no position.
-			DataDirPositions: []Position{{}},
-			PartialDirs:      DirList{Dirs: []string{"_components/sass"}, FromDefault: true},
+			// The defaults have no position.
+			TemplateDirPositions: []Position{{}},
+			DataDirPositions:     []Position{{}},
+			PartialDirs:          DirList{Dirs: []string{"_components/sass"}, FromDefault: true},
 		},
 		Output: Output{
 			Routing:             RoutingFile,
@@ -143,12 +144,13 @@ default:
 			Port:         8080,
 		},
 		Input: Input{
-			ContentDir:         "src",
-			ContentDirPosition: Position{Line: 17, Col: 12},
-			TemplateDirs:       DirList{Dirs: []string{"src/_layouts", "shared/templates"}},
-			DataDirs:           DirList{Dirs: []string{"shared/data"}},
-			DataDirPositions:   []Position{{Line: 19, Col: 9}},
-			PartialDirs:        DirList{Dirs: []string{"styles/partials"}},
+			ContentDir:           "src",
+			ContentDirPosition:   Position{Line: 17, Col: 12},
+			TemplateDirs:         DirList{Dirs: []string{"src/_layouts", "shared/templates"}},
+			TemplateDirPositions: []Position{{Line: 18, Col: 15}, {Line: 18, Col: 29}},
+			DataDirs:             DirList{Dirs: []string{"shared/data"}},
+			DataDirPositions:     []Position{{Line: 19, Col: 9}},
+			PartialDirs:          DirList{Dirs: []string{"styles/partials"}},
 		},
 		Output: Output{
 			Routing: RoutingDirectory,
@@ -237,6 +239,7 @@ func TestParseRealValuesAreKept(t *testing.T) {
 		}},
 		{"empty template list", "input:\n  templates: []\n", func(c *Config) {
 			c.Input.TemplateDirs = DirList{Dirs: []string{}}
+			c.Input.TemplateDirPositions = []Position{}
 		}},
 		{"empty data list", "input:\n  data: []\n", func(c *Config) {
 			c.Input.DataDirs = DirList{Dirs: []string{}}
@@ -562,6 +565,9 @@ func TestParseErrors(t *testing.T) {
 		{"custom permalink", withMinimal("default:\n  permalink: /blog/\n"),
 			`gondola.yaml:6:14: default.permalink is "/blog/"; it must be "path", "slug" or "date" (custom permalinks go in a page's front matter)`},
 		{"layout given a list", withMinimal("default:\n  layout: [a]\n"), `gondola.yaml:6:11: default.layout must be text, not a list`},
+		{"Jet function", withMinimal("default:\n  url: /x\n"), `gondola.yaml:6:3: default key "url" is the name of a Jet function and cannot be a template variable; please rename it`},
+		{"layout with dot dot", withMinimal("default:\n  layout: ../base\n"), `gondola.yaml:6:11: default.layout "../base" is not allowed: layout names are relative to the template directories and may not contain ".." or be absolute`},
+		{"layout with empty part", withMinimal("default:\n  layout: layouts//base\n"), `gondola.yaml:6:11: default.layout "layouts//base" has an empty or "." part; please write it as a path such as "page" or "blog/post"`},
 		{"fenced blocks without markdown", withMinimal("  fenced-blocks: true\n  markdown: false\n"),
 			`gondola.yaml:5:18: config.fenced-blocks is true but config.markdown is false; fenced blocks only work in Markdown pages`},
 

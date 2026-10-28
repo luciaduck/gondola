@@ -1,10 +1,13 @@
 package naming
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/CloudyKit/jet/v6"
 )
 
 func TestTemplateName(t *testing.T) {
@@ -120,6 +123,40 @@ func TestTemplateNameEveryKeyword(t *testing.T) {
 	}
 }
 
+func TestCheckReservedEveryJetFunction(t *testing.T) {
+	for name := range jetFunctions {
+		if err := CheckReserved(name, name, "key"); err == nil {
+			t.Errorf("CheckReserved(%q) accepted a Jet function", name)
+		}
+	}
+}
+
+// TestJetFunctionsMatchJet checks that every name of the list is defined by
+// Jet in a template where nothing was set, and, as a control, that another
+// name is not. Jet does not export its list, so a function that a new Jet
+// adds is not noticed here: check default.go when Jet is upgraded.
+func TestJetFunctionsMatchJet(t *testing.T) {
+	set := jet.NewSet(jet.NewInMemLoader())
+	control, err := set.Parse("/p", "{{ isset(lowercase) }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var controlOutput bytes.Buffer
+	if err := control.Execute(&controlOutput, nil, nil); err != nil || controlOutput.String() != "false" {
+		t.Fatalf("control: got %q, %v; want false", controlOutput.String(), err)
+	}
+	for name := range jetFunctions {
+		template, err := set.Parse("/p", "{{ isset("+name+") }}")
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		var buffer bytes.Buffer
+		if err := template.Execute(&buffer, nil, nil); err != nil || buffer.String() != "true" {
+			t.Errorf("%s: Jet does not define it (%q, %v)", name, buffer.String(), err)
+		}
+	}
+}
+
 func TestTemplateNameNoun(t *testing.T) {
 	_, err := TemplateName("2024-stats", "data file name")
 	want := `data file name "2024-stats" becomes "2024Stats" in templates, which is not a valid name (names must start with a letter); please rename it`
@@ -143,10 +180,20 @@ func TestCheckReserved(t *testing.T) {
 		{"page", "page", `front matter key "page" is reserved by Gondola (templates use it for the page's URL and metadata); please rename it`},
 		// A key that only becomes a reserved name says so.
 		{"Site", "site", `front matter key "Site" becomes "site" in templates, which is reserved by Gondola (templates use it for the site settings); please rename it`},
+		// Jet's built-in functions (SPEC §4).
+		{"raw", "raw", `front matter key "raw" is the name of a Jet function and cannot be a template variable; please rename it`},
+		{"url", "url", `front matter key "url" is the name of a Jet function and cannot be a template variable; please rename it`},
+		{"Len", "len", `front matter key "Len" becomes "len" in templates, which is the name of a Jet function; please rename it`},
+		{"has-prefix", "hasPrefix", `front matter key "has-prefix" becomes "hasPrefix" in templates, which is the name of a Jet function; please rename it`},
+		{"include_if_exists", "includeIfExists", `front matter key "include_if_exists" becomes "includeIfExists" in templates, which is the name of a Jet function; please rename it`},
 		// Names that only contain a reserved word are fine.
 		{"site-name", "siteName", ""},
 		{"pages", "pages", ""},
 		{"content", "content", ""},
+		{"raw-html", "rawHtml", ""},
+		{"urls", "urls", ""},
+		// Case matters: Jet's function is safeHtml, not safeHTML.
+		{"safeHTML", "safeHTML", ""},
 	}
 	for _, test := range tests {
 		t.Run(test.key, func(t *testing.T) {

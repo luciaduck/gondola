@@ -1,0 +1,7 @@
+---
+layout: base
+section: Pages
+---
+<article class="{{ section }}">
+{{ copy|raw }}
+</article>

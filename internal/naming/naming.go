@@ -16,15 +16,30 @@ const wordSeparators = "-_"
 
 // jetKeywords are the words that Jet's lexer treats as keywords, so a
 // variable with one of these names could never be read in a template. Copied
-// from the key map in lex.go of github.com/CloudyKit/jet/v6 v6.2.0, plus
-// "true" and "false", which the lexer reads as booleans. Check this list when
-// Jet is upgraded.
+// from the key map in lex.go of github.com/CloudyKit/jet/v6 v6.2.0 (the
+// same in v6.3.3), plus "true" and "false", which the lexer reads as
+// booleans. Check this list when Jet is upgraded.
 var jetKeywords = map[string]bool{
 	"extends": true, "import": true, "include": true, "block": true,
 	"end": true, "yield": true, "content": true, "if": true, "else": true,
 	"range": true, "try": true, "catch": true, "return": true, "and": true,
 	"or": true, "not": true, "nil": true, "msg": true, "trans": true,
 	"true": true, "false": true,
+}
+
+// jetFunctions are the functions that Jet defines for every template, from
+// defaultVariables in default.go of github.com/CloudyKit/jet/v6 v6.3.3. A
+// top-level variable with one of these names hides the function in that
+// page: front matter "raw: true" would make every layout fail at
+// {{ copy|raw }}. A nested name, such as data.map, hides nothing. Check this
+// list when Jet is upgraded.
+var jetFunctions = map[string]bool{
+	"lower": true, "upper": true, "hasPrefix": true, "hasSuffix": true,
+	"repeat": true, "replace": true, "split": true, "trimSpace": true,
+	"html": true, "url": true, "safeHtml": true, "safeJs": true, "raw": true,
+	"unsafe": true, "writeJson": true, "json": true, "map": true,
+	"slice": true, "array": true, "isset": true, "len": true,
+	"includeIfExists": true, "exec": true, "ints": true, "dump": true,
 }
 
 // reservedPurposes maps the template variables that Gondola itself defines to
@@ -40,10 +55,18 @@ var reservedPurposes = map[string]string{
 	"page":        "the page's URL and metadata",
 }
 
-// CheckReserved returns an error if name, the template name of key, is one
-// of the variables that Gondola reserves for itself (copy, site, data, fleet,
-// collections, page). noun is used as for TemplateName.
+// CheckReserved returns an error if name, the template name of key, cannot
+// be a top-level template variable: it is one of the variables that Gondola
+// reserves for itself (copy, site, data, fleet, collections, page), or the
+// name of one of Jet's built-in functions (raw, len, isset, …). noun is used
+// as for TemplateName.
 func CheckReserved(key, name, noun string) error {
+	if jetFunctions[name] {
+		if name == key {
+			return fmt.Errorf("%s %q is the name of a Jet function and cannot be a template variable; please rename it", noun, key)
+		}
+		return fmt.Errorf("%s %q becomes %q in templates, which is the name of a Jet function; please rename it", noun, key, name)
+	}
 	purpose, reserved := reservedPurposes[name]
 	if !reserved {
 		return nil

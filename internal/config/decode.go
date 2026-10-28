@@ -130,12 +130,13 @@ func (v *fileValues) config() Config {
 	return Config{
 		Settings: settings,
 		Input: Input{
-			ContentDir:         v.contentDir.path,
-			ContentDirPosition: v.position(v.contentDir.node),
-			TemplateDirs:       v.templateDirs.dirList(),
-			DataDirs:           v.dataDirs.dirList(),
-			DataDirPositions:   v.positions(v.dataDirs.dirs),
-			PartialDirs:        v.partialDirs.dirList(),
+			ContentDir:           v.contentDir.path,
+			ContentDirPosition:   v.position(v.contentDir.node),
+			TemplateDirs:         v.templateDirs.dirList(),
+			TemplateDirPositions: v.positions(v.templateDirs.dirs),
+			DataDirs:             v.dataDirs.dirList(),
+			DataDirPositions:     v.positions(v.dataDirs.dirs),
+			PartialDirs:          v.partialDirs.dirList(),
 		},
 		Output: Output{
 			Routing:             v.routing,
@@ -389,6 +390,10 @@ func (v *fileValues) readDefault(name, label string, item keyValue) error {
 		layout := defaultLayout
 		if err := readText(&layout, label, item); err != nil {
 			return err
+		}
+		key := frontmatter.Key{Written: item.key, InDefault: true}
+		if err := frontmatter.CheckLayout(key, layout); err != nil {
+			return wrapAt(item.valueNode, err)
 		}
 		v.variables[name] = layout
 		return nil

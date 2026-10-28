@@ -18,6 +18,13 @@ func TestHeadingIDs(t *testing.T) {
 		{"Italian", nil, []string{"Perché sì, però no"}, []string{"perche-si-pero-no"}},
 		{"other scripts are transliterated", nil, []string{"你好"}, []string{"ni-hao"}},
 		{"ampersand", nil, []string{"Q&A"}, []string{"qanda"}},
+		// Jet escapes the variables it writes into a page, so a heading may
+		// hold entities; they are decoded before the slug is made.
+		{"escaped ampersand", nil, []string{"Fish &amp; chips"}, []string{"fish-and-chips"}},
+		{"numeric entities", nil, []string{"Caf&#233; &#x3C;b&#x3E;"}, []string{"cafe-b"}},
+		{"named accent", nil, []string{"Citt&agrave;"}, []string{"citta"}},
+		{"escaped quote", nil, []string{"&#34;Quoted&#34;"}, []string{"quoted"}},
+		{"not an entity", nil, []string{"AT&T &amp"}, []string{"atandt-and"}},
 		{"Markdown is written as is", nil, []string{"**Bold** `code` text"}, []string{"bold-code-text"}},
 		{"underscores are kept", nil, []string{"snake_case"}, []string{"snake_case"}},
 		{"surrounding spaces and dashes", nil, []string{"  - spaced -  "}, []string{"spaced"}},

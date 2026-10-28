@@ -1,0 +1,9 @@
+---
+layout: nil
+---
+<!doctype html>
+<title>{{ title }} · {{ site.name }}</title>
+{{ include "header" }}
+<main>
+{{ copy|raw }}
+</main>

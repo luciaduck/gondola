@@ -126,8 +126,9 @@ func readVariables(source yamlnode.Source) (map[string]any, error) {
 //
 //   - An empty value (null, ~, nothing, "", or a tag with no text) is "".
 //   - layout, title, author and permalink are text, kept exactly as written
-//     (title: 0.10 is "0.10"). A tag on the text is ignored. permalink is
-//     also checked with the rules of CheckPermalink.
+//     (title: 0.10 is "0.10"). A tag on the text is ignored. layout and
+//     permalink are also checked with the rules of CheckLayout and
+//     CheckPermalink.
 //   - sitemap and excludeFromFleet are YAML booleans.
 //   - tags is one tag or a list of tags, and becomes a []string. Tags are
 //     trimmed; an empty tag, a tag listed twice and the tag "fleet" are
@@ -143,7 +144,9 @@ func ReadValue(name string, key Key, node *yaml.Node, source yamlnode.Source) (a
 		return "", nil
 	}
 	switch name {
-	case layoutKey, titleKey, authorKey:
+	case layoutKey:
+		return readLayout(key, node)
+	case titleKey, authorKey:
 		return readText(key, node)
 	case permalinkKey:
 		return readPermalink(key, node)
@@ -164,6 +167,18 @@ func readText(key Key, node *yaml.Node) (string, error) {
 	}
 	// Value is the text as written, so 0.10 stays "0.10".
 	return value.Value, nil
+}
+
+// readLayout reads text and checks it with the rules of CheckLayout.
+func readLayout(key Key, node *yaml.Node) (string, error) {
+	layout, err := readText(key, node)
+	if err != nil {
+		return "", err
+	}
+	if err := CheckLayout(key, layout); err != nil {
+		return "", yamlnode.WrapAt(node, err)
+	}
+	return layout, nil
 }
 
 // readPermalink reads text and checks it with the rules of CheckPermalink.

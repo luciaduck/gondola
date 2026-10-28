@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"html"
 	"strconv"
 
 	"github.com/gosimple/slug"
@@ -29,9 +30,13 @@ func newHeadingIDs() *headingIDs {
 }
 
 // Generate returns a new id for a heading whose source line is value (the
-// Markdown as written, so "## **Bold** text" gives "bold-text").
+// Markdown as written, so "## **Bold** text" gives "bold-text"). HTML
+// entities are decoded first, because Jet escapes the variables it writes
+// into a page: "# {{ title }}" with the title "Fish & chips" reaches
+// Goldmark as "# Fish &amp; chips", and its id must still be
+// "fish-and-chips".
 func (h *headingIDs) Generate(value []byte, _ ast.NodeKind) []byte {
-	id := slug.Make(string(value))
+	id := slug.Make(html.UnescapeString(string(value)))
 	if id == "" {
 		id = fallbackHeadingID
 	}

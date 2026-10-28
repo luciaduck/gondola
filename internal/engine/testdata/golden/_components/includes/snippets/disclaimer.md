@@ -1,0 +1,3 @@
+::: +small
+*Opinions are mine.*
+:::
