@@ -1,0 +1,8 @@
+---
+layout: base
+section: Pages
+---
+<article>
+{{ copy|raw }}
+<footer>By {{ author }}</footer>
+</article>

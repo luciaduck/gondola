@@ -1,0 +1,11 @@
+> site is taking a gondola ride
+> squero is crafting any fenced block
+\gondola/ Shaping ./_site.temp/about-us/index.html from ./src/about.html (jet)
+\gondola/ Shaping ./_site.temp/2024/05/01/fish-and-chips.html from ./src/blog/first-post.md (jet)
+\gondola/ Shaping ./_site.temp/2024/06/15/citta-di-mare.html from ./src/blog/second-post.md (jet)
+\gondola/ Shaping ./_site.temp/feed.xml from ./src/feed.xml.html
+\gondola/ Shaping ./_site.temp/index.html from ./src/index.md (jet)
+\gondola/ Shaping ./_site.temp/pag/geo/orders.html from ./src/pag/geo/orders.htm (jet)
+\gondola/ Shaping ./_site.temp/raw.html from ./src/raw.md
+\gondola/ Shipping _site.temp to _site
+\gondola/ Built 7 files and Copied 5 in 0.04 seconds (3.33ms each, v0.0.1)

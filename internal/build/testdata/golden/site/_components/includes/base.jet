@@ -1,0 +1,19 @@
+---
+layout: nil
+section: Site
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }} · {{ site.name }}</title>
+<meta property="og:image" content="{{ ogImage }}">
+<link rel="stylesheet" href="/style/main.css">
+</head>
+<body>
+{{ include "header.html" }}
+<main class="{{ section }}">
+{{ copy|raw }}
+</main>
+</body>
+</html>

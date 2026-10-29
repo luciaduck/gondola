@@ -1,0 +1,7 @@
+---
+layout: page
+section: Blog
+permalink: date
+---
+<p class="date">{{ date }}</p>
+{{ copy|raw }}

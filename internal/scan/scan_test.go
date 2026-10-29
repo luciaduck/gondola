@@ -323,6 +323,48 @@ func TestScanOutputCollisions(t *testing.T) {
 	})
 }
 
+// TestScanReturnsOutputPaths checks that the build can claim the pages'
+// paths on the record that Scan filled, so that a page colliding with a
+// Sass or passthrough output is caught.
+func TestScanReturnsOutputPaths(t *testing.T) {
+	cfg := parseConfig(t, "output:\n  passthrough: [\"*.txt\"]\n")
+	root := makeTree(t, "robots.txt", "style/main.scss", "index.html")
+	result, err := Scan(root, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		outputPath string
+		wantErr    string
+	}{
+		{"robots.txt", `passthrough file "robots.txt" and page "robots.md" both write "robots.txt" in the output; please rename or remove one`},
+		{"style/Main.css", `Sass entry point "style/main.scss" and page "robots.md" both write "style/main.css" and "style/Main.css", which differ only in letter case, in the output; please rename or remove one`},
+		{"index.html", ""},
+	}
+	for _, test := range tests {
+		err := result.OutputPaths.Claim(test.outputPath, PageSource, "robots.md")
+		switch {
+		case test.wantErr == "" && err != nil:
+			t.Errorf("Claim(%q): %v", test.outputPath, err)
+		case test.wantErr != "" && (err == nil || err.Error() != test.wantErr):
+			t.Errorf("Claim(%q) = %v, want %s", test.outputPath, err, test.wantErr)
+		}
+	}
+}
+
+func TestScanReturnsOutputPathsWithoutOutputs(t *testing.T) {
+	result, err := Scan(makeTree(t, "index.html"), parseConfig(t, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OutputPaths == nil {
+		t.Fatal("OutputPaths is nil")
+	}
+	if err := result.OutputPaths.Claim("index.html", PageSource, "index.html"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestScanOutputCollisionsInLetterCase(t *testing.T) {
 	if fileSystemIgnoresCase(t) {
 		t.Skip("this file system cannot hold two names that differ only in letter case")

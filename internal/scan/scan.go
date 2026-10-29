@@ -35,6 +35,11 @@ type Result struct {
 	Pages            []Page
 	SassEntryPoints  []SassEntryPoint
 	PassthroughFiles []PassthroughFile
+	// OutputPaths holds the output paths of the Sass entry points and the
+	// passthrough files. The build claims the pages' paths on it too, so
+	// that a page that writes the same file as one of them is caught. It
+	// is never nil.
+	OutputPaths *OutputPaths
 }
 
 // Page is a source file that becomes a page.
@@ -144,7 +149,6 @@ type walker struct {
 	sass              bool
 	ignoresLetterCase bool
 	patterns          []*patternUse
-	outputPaths       OutputPaths
 	result            Result
 }
 
@@ -155,6 +159,7 @@ func newWalker(projectDir string, cfg config.Config, patterns []*patternUse) *wa
 		sass:              cfg.Settings.Sass,
 		ignoresLetterCase: cfg.IgnoresLetterCase,
 		patterns:          patterns,
+		result:            Result{OutputPaths: &OutputPaths{}},
 	}
 	if cfg.Input.ContentDir != "." {
 		w.contentLevels = strings.Split(cfg.Input.ContentDir, "/")
@@ -224,7 +229,7 @@ func (w *walker) visitFile(levels []string, inPageArea bool) error {
 		if err := CheckNameEncoding(levels, false); err != nil {
 			return err
 		}
-		if err := w.outputPaths.Claim(sourcePath, PassthroughSource, sourcePath); err != nil {
+		if err := w.result.OutputPaths.Claim(sourcePath, PassthroughSource, sourcePath); err != nil {
 			return err
 		}
 		w.result.PassthroughFiles = append(w.result.PassthroughFiles, PassthroughFile{SourcePath: sourcePath, OutputPath: sourcePath})
@@ -249,7 +254,7 @@ func (w *walker) visitFile(levels []string, inPageArea bool) error {
 		// The extension is cut by its length, not by its letters, so
 		// "Main.SCSS" becomes "Main.css".
 		outputPath := contentPath[:len(contentPath)-len(extension)] + cssExtension
-		if err := w.outputPaths.Claim(outputPath, SassSource, sourcePath); err != nil {
+		if err := w.result.OutputPaths.Claim(outputPath, SassSource, sourcePath); err != nil {
 			return err
 		}
 		w.result.SassEntryPoints = append(w.result.SassEntryPoints, SassEntryPoint{SourcePath: sourcePath, OutputPath: outputPath})

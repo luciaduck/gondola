@@ -9,8 +9,11 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"time"
 
+	"github.com/luciaduck/gondola/internal/build"
 	"github.com/luciaduck/gondola/internal/console"
+	"github.com/luciaduck/gondola/internal/sass"
 )
 
 // version is Gondola's version. It is empty unless it is set at release time
@@ -53,15 +56,21 @@ func main() {
 	printer := console.New(
 		console.Stream{Writer: os.Stdout, Color: console.ColorFor(os.Stdout, noColor)},
 		console.Stream{Writer: os.Stderr, Color: console.ColorFor(os.Stderr, noColor)},
-		os.DirFS("."),
+		os.DirFS(workingDir),
 	)
 	buildInfo, _ := debug.ReadBuildInfo()
-	os.Exit(run(os.Args[1:], resolveVersion(version, buildInfo), printer))
+	os.Exit(run(os.Args[1:], resolveVersion(version, buildInfo), workingDir, printer))
 }
 
-// run executes the command line args (without the program name) and returns
-// the exit code. It is separate from main so that tests can call it.
-func run(args []string, gondolaVersion string, printer *console.Printer) int {
+// workingDir is the project directory: Gondola builds the site in the
+// directory where it is run.
+const workingDir = "."
+
+// run executes the command line args (without the program name) on the
+// project in projectDir and returns the exit code. It is separate from main
+// so that tests can call it on a directory of their own; printer must read
+// error excerpts from projectDir too.
+func run(args []string, gondolaVersion, projectDir string, printer *console.Printer) int {
 	if len(args) == 0 {
 		printer.PrintStderr(helpText)
 		return exitUsageError
@@ -80,14 +89,41 @@ func run(args []string, gondolaVersion string, printer *console.Printer) int {
 	case "--version":
 		printer.Print(fmt.Sprintf("gondola %s\n", gondolaVersion))
 		return exitSuccess
-	case "ride", "serve":
-		// ride arrives with milestone M9, serve with M12.
+	case "ride":
+		return ride(gondolaVersion, projectDir, printer)
+	case "serve":
+		// serve arrives with milestone M12.
 		printer.Error(fmt.Errorf("%q is not available yet", command))
 		return exitBuildError
 	default:
 		printer.Error(fmt.Errorf("unknown command %q; run gondola --help", command))
 		return exitUsageError
 	}
+}
+
+// ride builds the site in projectDir once and returns the exit code.
+func ride(gondolaVersion, projectDir string, printer *console.Printer) int {
+	failure := build.Run(build.Options{
+		ProjectDir:     projectDir,
+		GondolaVersion: gondolaVersion,
+		SassStyle:      sass.Compressed,
+		Printer:        printer,
+		Now:            time.Now,
+	})
+	if failure == nil {
+		return exitSuccess
+	}
+	printFailure(printer, failure)
+	return exitBuildError
+}
+
+// printFailure prints the errors of a failed build in the order they were
+// found, then the line that counts them.
+func printFailure(printer *console.Printer, failure *build.Failure) {
+	for _, err := range failure.Errors {
+		printer.Error(err)
+	}
+	printer.BuildFailed(len(failure.Errors), failure.LimitReached)
 }
 
 // resolveVersion returns the version Gondola reports. In order: the version

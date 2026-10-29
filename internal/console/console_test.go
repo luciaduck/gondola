@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/luciaduck/gondola/internal/diag"
 )
@@ -249,6 +250,75 @@ func TestSteps(t *testing.T) {
 				t.Errorf("standard error is not empty: %q", errOut.String())
 			}
 		})
+	}
+}
+
+func TestBuildLines(t *testing.T) {
+	built := func(pages, copied int, elapsed time.Duration) func(*Printer) {
+		return func(p *Printer) { p.Built(pages, copied, elapsed, "v0.0.1") }
+	}
+	tests := []struct {
+		name  string
+		print func(*Printer)
+		color bool
+		want  string
+	}{
+		{"shaping with an engine, example of SPEC §5.14",
+			func(p *Printer) { p.Shaping("_site.temp/404.html", "404.html", "jet") }, false,
+			"\\gondola/ Shaping ./_site.temp/404.html from ./404.html (jet)\n"},
+		{"shaping a page in a directory, example of SPEC §5.14",
+			func(p *Printer) { p.Shaping("_site.temp/pag/geo/orders.html", "pag/geo/orders.htm", "jet") }, false,
+			"\\gondola/ Shaping ./_site.temp/pag/geo/orders.html from ./pag/geo/orders.htm (jet)\n"},
+		{"shaping a page with layout: nil has no parentheses",
+			func(p *Printer) { p.Shaping("_site.temp/raw.html", "src/raw.md", "") }, false,
+			"\\gondola/ Shaping ./_site.temp/raw.html from ./src/raw.md\n"},
+		{"shipping, example of SPEC §5.14",
+			func(p *Printer) { p.Shipping("_site.temp", "_site") }, false,
+			"\\gondola/ Shipping _site.temp to _site\n"},
+		{"built, example of SPEC §5.14",
+			built(4, 3, 40*time.Millisecond), false,
+			"\\gondola/ Built 4 files and Copied 3 in 0.04 seconds (5.71ms each, v0.0.1)\n"},
+		{"one page is one file",
+			built(1, 3, 40*time.Millisecond), false,
+			"\\gondola/ Built 1 file and Copied 3 in 0.04 seconds (10.00ms each, v0.0.1)\n"},
+		{"one page and one copied file",
+			built(1, 1, 3*time.Second), false,
+			"\\gondola/ Built 1 file and Copied 1 in 3.00 seconds (1500.00ms each, v0.0.1)\n"},
+		{"no pages is plural",
+			built(0, 2, 10*time.Millisecond), false,
+			"\\gondola/ Built 0 files and Copied 2 in 0.01 seconds (5.00ms each, v0.0.1)\n"},
+		{"no files at all leaves out each",
+			built(0, 0, 10*time.Millisecond), false,
+			"\\gondola/ Built 0 files and Copied 0 in 0.01 seconds (v0.0.1)\n"},
+		{"rounding",
+			built(2, 1, 4567*time.Microsecond), false,
+			"\\gondola/ Built 2 files and Copied 1 in 0.00 seconds (1.52ms each, v0.0.1)\n"},
+		{"only the prefix is cyan",
+			func(p *Printer) { p.Shipping("_site.temp", "_site") }, true,
+			"\x1b[36m\\gondola/\x1b[0m Shipping _site.temp to _site\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			printer, out, errOut := newTestPrinter(test.color, nil)
+			test.print(printer)
+			if out.String() != test.want {
+				t.Errorf("got %q, want %q", out.String(), test.want)
+			}
+			if errOut.Len() != 0 {
+				t.Errorf("standard error is not empty: %q", errOut.String())
+			}
+		})
+	}
+}
+
+func TestWarningIsNotColored(t *testing.T) {
+	printer, out, errOut := newTestPrinter(true, nil)
+	printer.Warning("warning: style/main.scss:3:5: this is deprecated")
+	if want := "warning: style/main.scss:3:5: this is deprecated\n"; errOut.String() != want {
+		t.Errorf("standard error = %q, want %q", errOut.String(), want)
+	}
+	if out.Len() != 0 {
+		t.Errorf("standard output is not empty: %q", out.String())
 	}
 }
 

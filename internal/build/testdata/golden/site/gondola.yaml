@@ -1,0 +1,24 @@
+# The fixture site of the build's golden test: it uses every feature of
+# stages 1 to 6 and 9 of SPEC §3.1.
+config:
+  site-name: "Lindos & Co"
+  version: 1.0
+  canonical-url: https://example.com/
+  description: A site that uses every feature of the build
+  fenced-blocks: true
+  date-format: "2 January 2006"
+
+input:
+  content: src
+
+output:
+  passthrough:
+    - robots.txt
+    - static/
+    - .well-known/
+    - src/_redirects
+
+default:
+  layout: page
+  author: Lucia
+  og-image: /static/og.png

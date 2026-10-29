@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/luciaduck/gondola/internal/diag"
 	"github.com/luciaduck/gondola/internal/sourcetext"
@@ -32,6 +33,13 @@ const (
 	craftingFencedBlock = "squero is crafting any fenced block"
 	askingSandolo       = "asking sandolo to serve"
 	errorPrefix         = "error: "
+	// gondolaPrefix begins the lines about the files of a build. The
+	// backslash is part of the text.
+	gondolaPrefix   = `\gondola/`
+	shapingFormat   = "Shaping ./%s from ./%s"
+	shippingFormat  = "Shipping %s to %s"
+	builtFormat     = "Built %d %s and Copied %d in %.2f seconds (%s)"
+	builtEachFormat = "%.2fms each, %s"
 )
 
 // minLineNumberWidth is the width of the line number in the gutter of an
@@ -89,6 +97,63 @@ func (p *Printer) CraftingFencedBlocks() {
 // AskingSandolo prints the line that starts the development server.
 func (p *Printer) AskingSandolo() {
 	p.step(askingSandolo)
+}
+
+// Shaping prints the line for a page that was just written. outputFilePath
+// is the page's file in the temp output and sourcePath its source, both
+// relative to the project root and written with "/":
+//
+//	\gondola/ Shaping ./_site.temp/404.html from ./404.html (jet)
+//
+// engineName is the template engine that ran on the page, or "" for a page
+// with layout: nil, whose line has no parentheses.
+func (p *Printer) Shaping(outputFilePath, sourcePath, engineName string) {
+	text := fmt.Sprintf(shapingFormat, outputFilePath, sourcePath)
+	if engineName != "" {
+		text += " (" + engineName + ")"
+	}
+	p.gondolaLine(text)
+}
+
+// Shipping prints the line that publishes the build: tempDir is renamed to
+// outputDir. Both are relative to the project root, written with "/".
+func (p *Printer) Shipping(tempDir, outputDir string) {
+	p.gondolaLine(fmt.Sprintf(shippingFormat, tempDir, outputDir))
+}
+
+// Built prints the last line of a successful build:
+//
+//	\gondola/ Built 4 files and Copied 3 in 0.04 seconds (5.71ms each, v0.0.1)
+//
+// pageCount is the number of pages written and copiedCount the number of
+// passthrough files; Sass files count in neither. elapsed is the time of the
+// whole build, and "each" is elapsed divided by both counts together. It is
+// left out when both are 0, which would divide by zero. "file" is singular
+// for exactly one page; "Copied" has no noun, so it needs no plural.
+func (p *Printer) Built(pageCount, copiedCount int, elapsed time.Duration, gondolaVersion string) {
+	noun := "files"
+	if pageCount == 1 {
+		noun = "file"
+	}
+	details := gondolaVersion
+	if fileCount := pageCount + copiedCount; fileCount > 0 {
+		millisecondsEach := float64(elapsed) / float64(time.Millisecond) / float64(fileCount)
+		details = fmt.Sprintf(builtEachFormat, millisecondsEach, gondolaVersion)
+	}
+	p.gondolaLine(fmt.Sprintf(builtFormat, pageCount, noun, copiedCount, elapsed.Seconds(), details))
+}
+
+// Warning prints a warning that does not stop the build, such as one from
+// Dart Sass, to standard error in the default color. text is one message
+// without a final line break.
+func (p *Printer) Warning(text string) {
+	io.WriteString(p.errOut.Writer, text+"\n")
+}
+
+// gondolaLine prints a line that begins with "\gondola/". Only the prefix is
+// cyan; the rest is in the default color.
+func (p *Printer) gondolaLine(text string) {
+	io.WriteString(p.out.Writer, paint(p.out.Color, ansiCyan, gondolaPrefix)+" "+text+"\n")
 }
 
 // step prints a line that begins with "> ", all of it in cyan.
