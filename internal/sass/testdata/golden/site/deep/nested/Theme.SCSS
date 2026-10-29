@@ -1,0 +1,5 @@
+@use 'sass:math';
+
+.theme {
+  width: math.div(10px, 4);
+}

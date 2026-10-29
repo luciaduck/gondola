@@ -161,11 +161,14 @@ type Input struct {
 	// DataDirPositions are where the entries of DataDirs are written, at
 	// the same indexes, for the messages of package data, which checks that
 	// the directories exist. The positions are zero for the default.
-	// Partials could keep theirs the same way when package sass needs them.
 	DataDirPositions []Position
 	// PartialDirs are the Sass load paths ("partials" in the Sass sense).
 	// They are never scanned for entry points.
 	PartialDirs DirList
+	// PartialDirPositions are where the entries of PartialDirs are written,
+	// at the same indexes, for the messages of package sass, which checks
+	// that the directories exist. The positions are zero for the default.
+	PartialDirPositions []Position
 }
 
 // DirList is the value of a key that accepts a path or a list of paths.

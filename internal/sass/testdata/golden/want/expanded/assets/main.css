@@ -1,0 +1,14 @@
+body {
+  color: #222222;
+  margin: 1rem;
+}
+body a {
+  color: #0066cc;
+}
+body a:hover {
+  text-decoration: underline;
+}
+
+.note::before {
+  content: "→ ";
+}

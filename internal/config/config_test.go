@@ -53,6 +53,7 @@ func defaultConfig() Config {
 			TemplateDirPositions: []Position{{}},
 			DataDirPositions:     []Position{{}},
 			PartialDirs:          DirList{Dirs: []string{"_components/sass"}, FromDefault: true},
+			PartialDirPositions:  []Position{{}},
 		},
 		Output: Output{
 			Routing:             RoutingFile,
@@ -151,6 +152,7 @@ default:
 			DataDirs:             DirList{Dirs: []string{"shared/data"}},
 			DataDirPositions:     []Position{{Line: 19, Col: 9}},
 			PartialDirs:          DirList{Dirs: []string{"styles/partials"}},
+			PartialDirPositions:  []Position{{Line: 20, Col: 14}},
 		},
 		Output: Output{
 			Routing: RoutingDirectory,
@@ -247,6 +249,11 @@ func TestParseRealValuesAreKept(t *testing.T) {
 		}},
 		{"empty partials list", "input:\n  partials: []\n", func(c *Config) {
 			c.Input.PartialDirs = DirList{Dirs: []string{}}
+			c.Input.PartialDirPositions = []Position{}
+		}},
+		{"partial dirs keep their positions", "input:\n  partials: [styles, vendor/sass]\n", func(c *Config) {
+			c.Input.PartialDirs = DirList{Dirs: []string{"styles", "vendor/sass"}}
+			c.Input.PartialDirPositions = []Position{{Line: 6, Col: 14}, {Line: 6, Col: 22}}
 		}},
 		{"default dir written by hand", "input:\n  data: _data\n", func(c *Config) {
 			c.Input.DataDirs = DirList{Dirs: []string{"_data"}}

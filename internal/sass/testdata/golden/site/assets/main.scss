@@ -1,0 +1,20 @@
+// colors is found next to this file; spacing only in _components/sass.
+@use 'colors';
+@use 'spacing';
+
+body {
+  color: colors.$text;
+  margin: spacing.$gap;
+
+  a {
+    color: colors.$link;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.note::before {
+  content: "→ ";
+}

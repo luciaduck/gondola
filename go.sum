@@ -2,6 +2,8 @@ github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 h1:sR+/8Yb4s
 github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53/go.mod h1:+3IMCy2vIlbG1XG/0ggNQv0SvxCAIpPM5b1nCz56Xno=
 github.com/CloudyKit/jet/v6 v6.3.3 h1:a3EUQtQFmNDTw+dVpwyyWb04l/TxU5VfJ+hiGsws1sQ=
 github.com/CloudyKit/jet/v6 v6.3.3/go.mod h1:lf8ksdNsxZt7/yH/3n4vJQWA9RUq4wpaHtArHhGVMOw=
+github.com/bep/godartsass/v2 v2.5.0 h1:tKRvwVdyjCIr48qgtLa4gHEdtRkPF8H1OeEhJAEv7xg=
+github.com/bep/godartsass/v2 v2.5.0/go.mod h1:rjsi1YSXAl/UbsGL85RLDEjRKdIKUlMQHr6ChUNYOFU=
 github.com/gosimple/slug v1.15.0 h1:wRZHsRrRcs6b0XnxMUBM6WK1U1Vg5B0R7VkIf1Xzobo=
 github.com/gosimple/slug v1.15.0/go.mod h1:UiRaFH+GEilHstLUmcBgWcI42viBN7mAb818JrYOeFQ=
 github.com/gosimple/unidecode v1.0.1 h1:hZzFTMMqSswvf0LBJZCZgThIZrpDHFXux9KeGmn6T/o=
@@ -10,6 +12,8 @@ github.com/luciaduck/squero v0.2.2 h1:KeZf5UBtya0NO6V6rggKuqywL41zhSCwOupd6xYJHT
 github.com/luciaduck/squero v0.2.2/go.mod h1:UrfIEwBY4rZMlUatxBNs0ZIrErAbbRD2Tplc1gskKnY=
 github.com/yuin/goldmark v1.8.6 h1:d0VcaP1sx9GkFVkoW+KtggpGi2KZ965i14b0+bDQST4=
 github.com/yuin/goldmark v1.8.6/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
+google.golang.org/protobuf v1.35.2 h1:8Ar7bF+apOIoThw1EdZl0p1oWvMqTHmpA2fRTyZO8io=
+google.golang.org/protobuf v1.35.2/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=

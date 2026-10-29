@@ -1,0 +1,4 @@
+config:
+  site-name: Golden
+  version: "1.0.0"
+  canonical-url: https://example.com

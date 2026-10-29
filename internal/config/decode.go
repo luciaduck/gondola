@@ -137,6 +137,7 @@ func (v *fileValues) config() Config {
 			DataDirs:             v.dataDirs.dirList(),
 			DataDirPositions:     v.positions(v.dataDirs.dirs),
 			PartialDirs:          v.partialDirs.dirList(),
+			PartialDirPositions:  v.positions(v.partialDirs.dirs),
 		},
 		Output: Output{
 			Routing:             v.routing,
