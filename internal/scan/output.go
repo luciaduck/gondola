@@ -14,6 +14,10 @@ const (
 	PageSource        SourceKind = "page"
 	SassSource        SourceKind = "Sass entry point"
 	PassthroughSource SourceKind = "passthrough file"
+	// SitemapSource is the sitemap that Gondola writes itself when
+	// config.sitemap is true. It has no source file, and a collision with
+	// it has a message of its own (M10, Q4).
+	SitemapSource SourceKind = "sitemap"
 )
 
 // OutputPaths records which source writes each file of the output, so that
@@ -52,10 +56,35 @@ func (o *OutputPaths) Claim(outputPath string, kind SourceKind, sourcePath strin
 		o.claims[key] = outputClaim{outputPath: outputPath, kind: kind, sourcePath: sourcePath}
 		return nil
 	}
+	if earlier.kind == SitemapSource {
+		return sitemapCollision(kind, sourcePath, outputPath)
+	}
+	if kind == SitemapSource {
+		return sitemapCollision(earlier.kind, earlier.sourcePath, earlier.outputPath)
+	}
 	if earlier.outputPath == outputPath {
 		return fmt.Errorf("%s %q and %s %q both write %q in the output; please rename or remove one",
 			earlier.kind, earlier.sourcePath, kind, sourcePath, outputPath)
 	}
 	return fmt.Errorf("%s %q and %s %q both write %q and %q, which differ only in letter case, in the output; please rename or remove one",
 		earlier.kind, earlier.sourcePath, kind, sourcePath, earlier.outputPath, outputPath)
+}
+
+// sitemapCollision is the error for a source that writes the file where
+// Gondola writes the sitemap. outputPath is the path the source writes,
+// which may differ from the sitemap's in letter case.
+func sitemapCollision(kind SourceKind, sourcePath, outputPath string) error {
+	return fmt.Errorf("%s %q writes %q, where Gondola writes the sitemap because config.sitemap is true; please rename or remove it, or turn config.sitemap off",
+		kind, sourcePath, outputPath)
+}
+
+// Source returns the kind and the source path of what writes outputPath,
+// written exactly so (letter case included), and false when nothing claimed
+// it.
+func (o *OutputPaths) Source(outputPath string) (SourceKind, string, bool) {
+	claim, found := o.claims[strings.ToLower(outputPath)]
+	if !found || claim.outputPath != outputPath {
+		return "", "", false
+	}
+	return claim.kind, claim.sourcePath, true
 }

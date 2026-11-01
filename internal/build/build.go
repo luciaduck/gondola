@@ -45,6 +45,7 @@ type Printer interface {
 	Warning(text string)
 	Shaping(outputFilePath, sourcePath, engineName string)
 	Shipping(tempDir, outputDir string)
+	Sitemap(listedCount int, robotsFound bool)
 	Built(pageCount, copiedCount int, elapsed time.Duration, gondolaVersion string)
 }
 
@@ -142,6 +143,9 @@ func (b *builder) run() error {
 	if err != nil {
 		return err
 	}
+	if err := b.claimSitemap(scanned.OutputPaths); err != nil {
+		return err
+	}
 	jet, err := b.newTemplateEngine()
 	if err != nil {
 		return err
@@ -164,7 +168,10 @@ func (b *builder) run() error {
 	if err := b.copyPassthroughFiles(scanned.PassthroughFiles); err != nil {
 		return err
 	}
-	// Stage 7 (the sitemap) and stage 8 (the plugins) go here.
+	if err := b.writeSitemap(pages, scanned.OutputPaths); err != nil {
+		return err
+	}
+	// Stage 8 (the plugins) goes here.
 	if err := b.publish(); err != nil {
 		return err
 	}

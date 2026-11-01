@@ -40,6 +40,22 @@ func TestOutputPathsClaim(t *testing.T) {
 			{"a.css", SassSource, "a.scss", `Sass entry point "a.sass" and Sass entry point "a.scss" both write "a.css" in the output; please rename or remove one`},
 			{"A.CSS", PassthroughSource, "A.CSS", `Sass entry point "a.sass" and passthrough file "A.CSS" both write "a.css" and "A.CSS", which differ only in letter case, in the output; please rename or remove one`},
 		}},
+		{"a passthrough file where the sitemap goes", []claim{
+			{"sitemap.xml", PassthroughSource, "sitemap.xml", ""},
+			{"sitemap.xml", SitemapSource, "", `passthrough file "sitemap.xml" writes "sitemap.xml", where Gondola writes the sitemap because config.sitemap is true; please rename or remove it, or turn config.sitemap off`},
+		}},
+		{"a page where the sitemap goes", []claim{
+			{"sitemap.xml", SitemapSource, "", ""},
+			{"sitemap.xml", PageSource, "src/map.md", `page "src/map.md" writes "sitemap.xml", where Gondola writes the sitemap because config.sitemap is true; please rename or remove it, or turn config.sitemap off`},
+		}},
+		{"the sitemap in other letters", []claim{
+			{"Sitemap.XML", PassthroughSource, "Sitemap.XML", ""},
+			{"sitemap.xml", SitemapSource, "", `passthrough file "Sitemap.XML" writes "Sitemap.XML", where Gondola writes the sitemap because config.sitemap is true; please rename or remove it, or turn config.sitemap off`},
+		}},
+		{"a page in other letters after the sitemap", []claim{
+			{"sitemap.xml", SitemapSource, "", ""},
+			{"SITEMAP.xml", PageSource, "a.html", `page "a.html" writes "SITEMAP.xml", where Gondola writes the sitemap because config.sitemap is true; please rename or remove it, or turn config.sitemap off`},
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -55,5 +71,25 @@ func TestOutputPathsClaim(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestOutputPathsSource(t *testing.T) {
+	var outputPaths OutputPaths
+	if _, _, found := outputPaths.Source("robots.txt"); found {
+		t.Error("the zero value found a source")
+	}
+	if err := outputPaths.Claim("robots.txt", PageSource, "src/robots.html"); err != nil {
+		t.Fatal(err)
+	}
+	if kind, sourcePath, found := outputPaths.Source("robots.txt"); !found || kind != PageSource || sourcePath != "src/robots.html" {
+		t.Errorf("Source(robots.txt) = %q, %q, %v", kind, sourcePath, found)
+	}
+	// Another file on a file system that tells letters apart.
+	if _, _, found := outputPaths.Source("Robots.txt"); found {
+		t.Error("Source(Robots.txt) found the claim of robots.txt")
+	}
+	if _, _, found := outputPaths.Source("other.txt"); found {
+		t.Error("Source(other.txt) found a source")
 	}
 }

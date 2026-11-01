@@ -7,5 +7,6 @@
 \gondola/ Shaping ./_site.temp/index.html from ./src/index.md (jet)
 \gondola/ Shaping ./_site.temp/pag/geo/orders.html from ./src/pag/geo/orders.htm (jet)
 \gondola/ Shaping ./_site.temp/raw.html from ./src/raw.md
+(sitemap) 4 pages were allowed by robots.txt
 \gondola/ Shipping _site.temp to _site
 \gondola/ Built 7 files and Copied 5 in 0.04 seconds (3.33ms each, v0.0.1)

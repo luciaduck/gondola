@@ -1,2 +1,6 @@
 User-agent: *
 Allow: /
+
+# The sitemap follows config.robots-agent, so this group leaves out pag/.
+User-agent: gondolabot
+Disallow: /pag/

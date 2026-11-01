@@ -40,6 +40,12 @@ const (
 	shippingFormat  = "Shipping %s to %s"
 	builtFormat     = "Built %d %s and Copied %d in %.2f seconds (%s)"
 	builtEachFormat = "%.2fms each, %s"
+	// The sitemap line has a singular and a plural form, and another text
+	// when there is no robots.txt (M10, Q2).
+	sitemapAllowedSingular  = "(sitemap) 1 page was allowed by robots.txt"
+	sitemapAllowedPlural    = "(sitemap) %d pages were allowed by robots.txt"
+	sitemapNoRobotsSingular = "(sitemap) 1 page was listed (there is no robots.txt)"
+	sitemapNoRobotsPlural   = "(sitemap) %d pages were listed (there is no robots.txt)"
 )
 
 // minLineNumberWidth is the width of the line number in the gutter of an
@@ -141,6 +147,29 @@ func (p *Printer) Built(pageCount, copiedCount int, elapsed time.Duration, gondo
 		details = fmt.Sprintf(builtEachFormat, millisecondsEach, gondolaVersion)
 	}
 	p.gondolaLine(fmt.Sprintf(builtFormat, pageCount, noun, copiedCount, elapsed.Seconds(), details))
+}
+
+// Sitemap prints the line written after sitemap.xml, in the default color:
+//
+//	(sitemap) 37 pages were allowed by robots.txt
+//
+// listedCount is the number of URLs in the sitemap, so pages with sitemap:
+// false are not counted. robotsFound is false when the output has no
+// robots.txt, and the line says so instead. "page" is singular for exactly
+// one, as "file" is on the last line.
+func (p *Printer) Sitemap(listedCount int, robotsFound bool) {
+	var text string
+	switch {
+	case robotsFound && listedCount == 1:
+		text = sitemapAllowedSingular
+	case robotsFound:
+		text = fmt.Sprintf(sitemapAllowedPlural, listedCount)
+	case listedCount == 1:
+		text = sitemapNoRobotsSingular
+	default:
+		text = fmt.Sprintf(sitemapNoRobotsPlural, listedCount)
+	}
+	io.WriteString(p.out.Writer, text+"\n")
 }
 
 // Warning prints a warning that does not stop the build, such as one from

@@ -1,5 +1,5 @@
 # The fixture site of the build's golden test: it uses every feature of
-# stages 1 to 6 and 9 of SPEC §3.1.
+# stages 1 to 7 and 9 of SPEC §3.1.
 config:
   site-name: "Lindos & Co"
   version: 1.0
@@ -7,6 +7,8 @@ config:
   description: A site that uses every feature of the build
   fenced-blocks: true
   date-format: "2 January 2006"
+  sitemap: true
+  robots-agent: Gondolabot
 
 input:
   content: src
