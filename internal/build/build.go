@@ -8,6 +8,7 @@ package build
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/luciaduck/gondola/internal/engine"
 	"github.com/luciaduck/gondola/internal/frontmatter"
 	"github.com/luciaduck/gondola/internal/parser"
+	"github.com/luciaduck/gondola/internal/plugin"
 	"github.com/luciaduck/gondola/internal/routing"
 	"github.com/luciaduck/gondola/internal/sass"
 	"github.com/luciaduck/gondola/internal/scan"
@@ -46,6 +48,7 @@ type Printer interface {
 	Shaping(outputFilePath, sourcePath, engineName string)
 	Shipping(tempDir, outputDir string)
 	Sitemap(listedCount int, robotsFound bool)
+	Executing(pluginPath, tempDir string)
 	Built(pageCount, copiedCount int, elapsed time.Duration, gondolaVersion string)
 }
 
@@ -68,7 +71,15 @@ type Options struct {
 	// SassStyle is Compressed for gondola ride and Expanded for gondola
 	// serve.
 	SassStyle sass.OutputStyle
-	Printer   Printer
+	// Mode tells the plugins which command runs the build.
+	Mode    plugin.Mode
+	Printer Printer
+	// Environment is what the plugins inherit, in the form of os.Environ.
+	Environment []string
+	// PluginStdout and PluginStderr receive the plugins' output as it is,
+	// without colors.
+	PluginStdout io.Writer
+	PluginStderr io.Writer
 	// Now returns the current time. The build reads it at the start and at
 	// the end to measure itself; tests give a clock of their own so that
 	// the last line is always the same.
@@ -171,7 +182,9 @@ func (b *builder) run() error {
 	if err := b.writeSitemap(pages, scanned.OutputPaths); err != nil {
 		return err
 	}
-	// Stage 8 (the plugins) goes here.
+	if err := b.runPlugins(); err != nil {
+		return err
+	}
 	if err := b.publish(); err != nil {
 		return err
 	}
@@ -202,7 +215,11 @@ func (b *builder) start() error {
 		}
 	}
 	b.markdown = parser.New(aliasFile)
-	// The plugins are checked here from milestone M11 (SPEC §3.1).
+	// Checked before anything is deleted, so a missing plugin keeps the old
+	// output (M11, Q2).
+	if err := plugin.Check(b.options.ProjectDir, b.cfg.Settings.PluginPaths, b.cfg.Settings.PluginPositions); err != nil {
+		return err
+	}
 	for _, dir := range []string{b.cfg.Output.Dir, b.cfg.Output.TempDir()} {
 		if err := os.RemoveAll(b.diskPath(dir)); err != nil {
 			return fmt.Errorf("deleting %s: %w", dir, withoutPath(err))
@@ -299,6 +316,19 @@ func (b *builder) compileSass(entryPoints []scan.SassEntryPoint, executablePath 
 		}
 	}
 	return nil
+}
+
+// runPlugins is stage 8. The first plugin that fails stops the build.
+func (b *builder) runPlugins() error {
+	return plugin.Run(b.cfg.Settings.PluginPaths, plugin.Options{
+		ProjectDir:  b.options.ProjectDir,
+		TempDir:     b.cfg.Output.TempDir(),
+		Mode:        b.options.Mode,
+		Environment: b.options.Environment,
+		Stdout:      b.options.PluginStdout,
+		Stderr:      b.options.PluginStderr,
+		Printer:     b.options.Printer,
+	})
 }
 
 // publish is stage 9: it replaces the output directory with the temp

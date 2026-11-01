@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/luciaduck/gondola/internal/console"
+	"github.com/luciaduck/gondola/internal/plugin"
 	"github.com/luciaduck/gondola/internal/sass"
 )
 
@@ -46,7 +47,8 @@ func (r buildResult) errorTexts() []string {
 }
 
 // runBuild builds the project in projectDir with a fake clock, printing
-// into buffers without colors.
+// into buffers without colors. Plugins write into the same buffers as the
+// console, as they do on a terminal, and inherit no environment.
 func runBuild(t testing.TB, projectDir string) buildResult {
 	t.Helper()
 	var stdout, stderr strings.Builder
@@ -55,7 +57,10 @@ func runBuild(t testing.TB, projectDir string) buildResult {
 		ProjectDir:     projectDir,
 		GondolaVersion: testVersion,
 		SassStyle:      sass.Compressed,
+		Mode:           plugin.Ride,
 		Printer:        printer,
+		PluginStdout:   &stdout,
+		PluginStderr:   &stderr,
 		Now:            fakeClock(testBuildDuration),
 	})
 	return buildResult{failure: failure, stdout: stdout.String(), stderr: stderr.String()}

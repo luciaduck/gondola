@@ -134,8 +134,12 @@ type Settings struct {
 	Markdown bool
 	// PluginPaths are the plugins to run on the finished build, in order.
 	PluginPaths []string
-	Engine      Engine
-	Sitemap     bool
+	// PluginPositions are where the entries of PluginPaths are written, at
+	// the same indexes, for the messages of package plugin, which checks
+	// that the plugins exist and are runnable.
+	PluginPositions []Position
+	Engine          Engine
+	Sitemap         bool
 	// RobotsAgent is the user-agent whose robots.txt rules filter the
 	// sitemap.
 	RobotsAgent string

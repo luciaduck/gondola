@@ -38,6 +38,7 @@ const (
 	gondolaPrefix   = `\gondola/`
 	shapingFormat   = "Shaping ./%s from ./%s"
 	shippingFormat  = "Shipping %s to %s"
+	executingFormat = "Executing %s in %s"
 	builtFormat     = "Built %d %s and Copied %d in %.2f seconds (%s)"
 	builtEachFormat = "%.2fms each, %s"
 	// The sitemap line has a singular and a plural form, and another text
@@ -125,6 +126,15 @@ func (p *Printer) Shaping(outputFilePath, sourcePath, engineName string) {
 // outputDir. Both are relative to the project root, written with "/".
 func (p *Printer) Shipping(tempDir, outputDir string) {
 	p.gondolaLine(fmt.Sprintf(shippingFormat, tempDir, outputDir))
+}
+
+// Executing prints the line written before a plugin runs. pluginPath is
+// the entry of config.plugin and tempDir the temp output, both relative to
+// the project root and written with "/":
+//
+//	\gondola/ Executing scripts/minify.sh in _site.temp
+func (p *Printer) Executing(pluginPath, tempDir string) {
+	p.gondolaLine(fmt.Sprintf(executingFormat, pluginPath, tempDir))
 }
 
 // Built prints the last line of a successful build:

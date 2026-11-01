@@ -127,6 +127,7 @@ func defaultDirList(dir string) locatedDirList {
 func (v *fileValues) config() Config {
 	settings := v.settings
 	settings.PluginPaths = paths(v.pluginPaths)
+	settings.PluginPositions = v.positions(v.pluginPaths)
 	return Config{
 		Settings: settings,
 		Input: Input{

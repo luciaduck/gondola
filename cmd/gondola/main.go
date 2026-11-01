@@ -13,6 +13,7 @@ import (
 
 	"github.com/luciaduck/gondola/internal/build"
 	"github.com/luciaduck/gondola/internal/console"
+	"github.com/luciaduck/gondola/internal/plugin"
 	"github.com/luciaduck/gondola/internal/sass"
 )
 
@@ -107,7 +108,11 @@ func ride(gondolaVersion, projectDir string, printer *console.Printer) int {
 		ProjectDir:     projectDir,
 		GondolaVersion: gondolaVersion,
 		SassStyle:      sass.Compressed,
+		Mode:           plugin.Ride,
 		Printer:        printer,
+		Environment:    os.Environ(),
+		PluginStdout:   os.Stdout,
+		PluginStderr:   os.Stderr,
 		Now:            time.Now,
 	})
 	if failure == nil {
