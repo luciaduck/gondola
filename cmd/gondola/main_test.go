@@ -44,12 +44,6 @@ func TestRun(t *testing.T) {
 			wantStdout: "gondola v0.0.1\n",
 		},
 		{
-			name:       "serve is not available yet",
-			args:       []string{"serve"},
-			wantCode:   exitBuildError,
-			wantStderr: "error: \"serve\" is not available yet\n",
-		},
-		{
 			name:       "unknown command",
 			args:       []string{"build"},
 			wantCode:   exitUsageError,
@@ -188,12 +182,24 @@ func TestRide(t *testing.T) {
 	t.Run("an error outside the pages", func(t *testing.T) {
 		projectDir := t.TempDir()
 		code, _, stderr := runInProject(t, projectDir, "ride")
-		want := "error: gondola.yaml not found in the current directory; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url\n" +
+		want := "error: gondola.yaml not found in " + filepath.ToSlash(projectDir) + "; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url\n" +
 			"build failed: 1 error\n"
 		if code != exitBuildError || stderr != want {
 			t.Errorf("exit code %d, standard error:\n%s", code, stderr)
 		}
 	})
+}
+
+func TestServeWithoutConfig(t *testing.T) {
+	// Without gondola.yaml there is no port to serve on, so serve stops
+	// after the first build as ride does, without reading standard input.
+	projectDir := writeProject(t, map[string]string{"index.html": "<p>hello</p>\n"})
+	code, stdout, stderr := runInProject(t, projectDir, "serve")
+	wantStderr := "error: gondola.yaml not found in " + filepath.ToSlash(projectDir) + "; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url\n" +
+		"build failed: 1 error\n"
+	if code != exitBuildError || stdout != "> site is taking a gondola ride\n" || stderr != wantStderr {
+		t.Errorf("exit code %d\nstandard output:\n%s\nstandard error:\n%s", code, stdout, stderr)
+	}
 }
 
 // runInProject runs the command line args on the project in projectDir and

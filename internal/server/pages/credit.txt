@@ -1,0 +1,21 @@
+Photo credits
+=============
+
+Gondola's waiting pages show two photos from Wikimedia Commons, embedded
+unmodified. Their Creative Commons licenses cover the photos only, not
+Gondola's code. Each page shows the photo's title, author and license, with
+links, beneath the image.
+
+1. "Venice Gondola Grand Canal" (shown while a build runs)
+   File:    Venice_Gondola_Grand_Canal.jpg (960 x 1248 px)
+   Author:  Saffron Blaze
+   Source:  https://commons.wikimedia.org/wiki/File:Venice_Gondola_Grand_Canal.jpg
+   License: CC BY-SA 3.0 Unported
+            https://creativecommons.org/licenses/by-sa/3.0/
+
+2. "Barena bassa Saccagnana" (shown after a failed build)
+   File:    Barena_bassa_Saccagnana.jpg (500 x 375 px)
+   Author:  AlbertoMara
+   Source:  https://commons.wikimedia.org/wiki/File:Barena_bassa_Saccagnana.jpg
+   License: CC BY-SA 4.0 International
+            https://creativecommons.org/licenses/by-sa/4.0/

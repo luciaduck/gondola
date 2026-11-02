@@ -379,7 +379,7 @@ func TestBuildWithoutConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := runBuild(t, projectDir)
-	want := []string{"gondola.yaml not found in the current directory; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url"}
+	want := []string{"gondola.yaml not found in " + filepath.ToSlash(projectDir) + "; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url"}
 	if got := result.errorTexts(); !reflect.DeepEqual(got, want) {
 		t.Errorf("errors:\n got %q\nwant %q", got, want)
 	}

@@ -4,17 +4,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/luciaduck/gondola/internal/build"
+	"github.com/luciaduck/gondola/internal/config"
 	"github.com/luciaduck/gondola/internal/console"
 	"github.com/luciaduck/gondola/internal/plugin"
 	"github.com/luciaduck/gondola/internal/sass"
+	"github.com/luciaduck/gondola/internal/server"
 )
 
 // version is Gondola's version. It is empty unless it is set at release time
@@ -47,7 +51,7 @@ const helpText = `Gondola builds a static site from the current directory, using
 
 Usage:
   gondola ride        build the site once
-  gondola serve       build, serve on localhost, rebuild when Enter is pressed
+  gondola serve       build and serve on localhost; type g to rebuild, q to close
   gondola --help      show this help
   gondola --version   print Gondola's version
 `
@@ -93,9 +97,7 @@ func run(args []string, gondolaVersion, projectDir string, printer *console.Prin
 	case "ride":
 		return ride(gondolaVersion, projectDir, printer)
 	case "serve":
-		// serve arrives with milestone M12.
-		printer.Error(fmt.Errorf("%q is not available yet", command))
-		return exitBuildError
+		return serve(gondolaVersion, projectDir, printer)
 	default:
 		printer.Error(fmt.Errorf("unknown command %q; run gondola --help", command))
 		return exitUsageError
@@ -118,17 +120,47 @@ func ride(gondolaVersion, projectDir string, printer *console.Printer) int {
 	if failure == nil {
 		return exitSuccess
 	}
-	printFailure(printer, failure)
+	printer.Failure(failure.Errors, failure.LimitReached)
 	return exitBuildError
 }
 
-// printFailure prints the errors of a failed build in the order they were
-// found, then the line that counts them.
-func printFailure(printer *console.Printer, failure *build.Failure) {
-	for _, err := range failure.Errors {
-		printer.Error(err)
+// serve builds the site in projectDir, serves it and builds it again on
+// request, until q or Ctrl+C, and returns the exit code.
+func serve(gondolaVersion, projectDir string, printer *console.Printer) int {
+	ctx, stopCatchingInterrupt := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stopCatchingInterrupt()
+	// After the first Ctrl+C the server lets the running build finish. A
+	// second one must end Gondola at once, as Go does by default, in case
+	// that build hangs.
+	go func() {
+		<-ctx.Done()
+		stopCatchingInterrupt()
+	}()
+	served := server.Run(ctx, server.Options{
+		ProjectDir:     projectDir,
+		GondolaVersion: gondolaVersion,
+		Build: func(configLoaded func(config.Config) error) *build.Failure {
+			return build.Run(build.Options{
+				ProjectDir:     projectDir,
+				GondolaVersion: gondolaVersion,
+				SassStyle:      sass.Expanded,
+				Mode:           plugin.Serve,
+				Printer:        printer,
+				Environment:    os.Environ(),
+				PluginStdout:   os.Stdout,
+				PluginStderr:   os.Stderr,
+				ConfigLoaded:   configLoaded,
+				Now:            time.Now,
+			})
+		},
+		Input:   os.Stdin,
+		Printer: printer,
+		Listen:  server.ListenOnLocalhost,
+	})
+	if !served {
+		return exitBuildError
 	}
-	printer.BuildFailed(len(failure.Errors), failure.LimitReached)
+	return exitSuccess
 }
 
 // resolveVersion returns the version Gondola reports. In order: the version

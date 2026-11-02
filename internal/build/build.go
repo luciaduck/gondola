@@ -80,6 +80,11 @@ type Options struct {
 	// without colors.
 	PluginStdout io.Writer
 	PluginStderr io.Writer
+	// ConfigLoaded, when not nil, is called with the settings as soon as
+	// gondola.yaml has been read, before anything is deleted; an error it
+	// returns stops the build. gondola serve uses it to learn the port and
+	// the output directory, and to refuse a change to them while serving.
+	ConfigLoaded func(config.Config) error
 	// Now returns the current time. The build reads it at the start and at
 	// the end to measure itself; tests give a clock of their own so that
 	// the last line is always the same.
@@ -204,6 +209,11 @@ func (b *builder) start() error {
 	b.cfg, err = config.Load(b.options.ProjectDir)
 	if err != nil {
 		return err
+	}
+	if b.options.ConfigLoaded != nil {
+		if err := b.options.ConfigLoaded(b.cfg); err != nil {
+			return err
+		}
 	}
 	aliasFile := parser.AliasFile{}
 	if b.cfg.Settings.FencedBlocks {

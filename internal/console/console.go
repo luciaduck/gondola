@@ -28,11 +28,16 @@ const (
 
 // Messages printed exactly as SPEC §5.14 writes them.
 const (
-	stepPrefix          = "> "
-	takingRideFormat    = "%s is taking a gondola ride"
-	craftingFencedBlock = "squero is crafting any fenced block"
-	askingSandolo       = "asking sandolo to serve"
-	errorPrefix         = "error: "
+	stepPrefix            = "> "
+	takingRideFormat      = "%s is taking a gondola ride"
+	craftingFencedBlock   = "squero is crafting any fenced block"
+	askingGondolierFormat = "asking a gondolier to take %s to port %d"
+	// The server's lines are written in SPEC §5.16, and are in the default
+	// color. The first comes from sandolo, the library that internal/server
+	// was copied from (M12, Q7).
+	serverReadyFormat = "Server ready at %s"
+	serverHelp        = "Type g and Enter to rebuild, or q and Enter to close."
+	errorPrefix       = "error: "
 	// gondolaPrefix begins the lines about the files of a build. The
 	// backslash is part of the text.
 	gondolaPrefix   = `\gondola/`
@@ -101,9 +106,23 @@ func (p *Printer) CraftingFencedBlocks() {
 	p.step(craftingFencedBlock)
 }
 
-// AskingSandolo prints the line that starts the development server.
-func (p *Printer) AskingSandolo() {
-	p.step(askingSandolo)
+// AskingGondolier prints the line that starts the development server of
+// gondola serve. outputDir is the output directory as configured, written
+// with "/".
+func (p *Printer) AskingGondolier(outputDir string, port int) {
+	p.step(fmt.Sprintf(askingGondolierFormat, outputDir, port))
+}
+
+// ServerReady prints the address where gondola serve is listening, such as
+// http://127.0.0.1:1094.
+func (p *Printer) ServerReady(siteURL string) {
+	io.WriteString(p.out.Writer, fmt.Sprintf(serverReadyFormat, siteURL)+"\n")
+}
+
+// ServerHelp prints the commands that gondola serve reads from standard
+// input.
+func (p *Printer) ServerHelp() {
+	io.WriteString(p.out.Writer, serverHelp+"\n")
 }
 
 // Shaping prints the line for a page that was just written. outputFilePath
@@ -217,6 +236,15 @@ func (p *Printer) Error(err error) {
 		lines = append(lines, p.excerpt(diagErr)...)
 	}
 	p.errorLines(lines)
+}
+
+// Failure prints the errors of a failed build in the order they were found,
+// then the line that counts them.
+func (p *Printer) Failure(errs []error, limitReached bool) {
+	for _, err := range errs {
+		p.Error(err)
+	}
+	p.BuildFailed(len(errs), limitReached)
 }
 
 // BuildFailed prints the last line of a failed build. limitReached says that

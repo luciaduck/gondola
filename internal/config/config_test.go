@@ -763,10 +763,24 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadMissingFile(t *testing.T) {
-	_, err := Load(t.TempDir())
-	want := `gondola.yaml not found in the current directory; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url`
-	if err == nil || err.Error() != want {
-		t.Errorf("error:\n got %v\nwant %s", err, want)
+	projectDir := t.TempDir()
+	workingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	relativeDir, err := filepath.Rel(workingDir, projectDir)
+	if err != nil {
+		t.Skipf("no relative path to the temporary directory: %v", err)
+	}
+	// The message names the directory as an absolute path, also when Load
+	// is given a relative one, as gondola gives ".".
+	want := "gondola.yaml not found in " + filepath.ToSlash(projectDir) +
+		"; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url"
+	for _, dir := range []string{projectDir, relativeDir} {
+		_, err := Load(dir)
+		if err == nil || err.Error() != want {
+			t.Errorf("Load(%q) error:\n got %v\nwant %s", dir, err, want)
+		}
 	}
 }
 

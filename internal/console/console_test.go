@@ -227,6 +227,34 @@ func TestBuildFailed(t *testing.T) {
 	}
 }
 
+func TestFailure(t *testing.T) {
+	tests := []struct {
+		name         string
+		errs         []error
+		limitReached bool
+		want         string
+	}{
+		{"one error", []error{errors.New("gondola.yaml not found")}, false,
+			"error: gondola.yaml not found\nbuild failed: 1 error\n"},
+		{"errors in the order they were found", []error{errors.New("first"), errors.New("second")}, false,
+			"error: first\nerror: second\nbuild failed: 2 errors\n"},
+		{"limit reached", []error{errors.New("first"), errors.New("second")}, true,
+			"error: first\nerror: second\nbuild failed: stopped after 2 errors\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			printer, out, errOut := newTestPrinter(false, nil)
+			printer.Failure(test.errs, test.limitReached)
+			if errOut.String() != test.want {
+				t.Errorf("got %q, want %q", errOut.String(), test.want)
+			}
+			if out.Len() != 0 {
+				t.Errorf("standard output is not empty: %q", out.String())
+			}
+		})
+	}
+}
+
 func TestSteps(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -236,7 +264,11 @@ func TestSteps(t *testing.T) {
 	}{
 		{"taking a ride", func(p *Printer) { p.TakingRide("my-site") }, false, "> my-site is taking a gondola ride\n"},
 		{"crafting fenced blocks", (*Printer).CraftingFencedBlocks, false, "> squero is crafting any fenced block\n"},
-		{"asking sandolo", (*Printer).AskingSandolo, false, "> asking sandolo to serve\n"},
+		{"asking a gondolier", func(p *Printer) { p.AskingGondolier("_site", 1094) }, false, "> asking a gondolier to take _site to port 1094\n"},
+		{"asking a gondolier with another directory and port", func(p *Printer) { p.AskingGondolier("build/www", 8080) }, false, "> asking a gondolier to take build/www to port 8080\n"},
+		{"asking a gondolier is cyan", func(p *Printer) { p.AskingGondolier("_site", 1094) }, true, "\x1b[36m> asking a gondolier to take _site to port 1094\x1b[0m\n"},
+		{"server ready is in the default color", func(p *Printer) { p.ServerReady("http://127.0.0.1:1094") }, true, "Server ready at http://127.0.0.1:1094\n"},
+		{"server help is in the default color", (*Printer).ServerHelp, true, "Type g and Enter to rebuild, or q and Enter to close.\n"},
 		{"the whole line is cyan", func(p *Printer) { p.TakingRide("my-site") }, true, "\x1b[36m> my-site is taking a gondola ride\x1b[0m\n"},
 	}
 	for _, test := range tests {

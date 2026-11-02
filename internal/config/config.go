@@ -241,20 +241,32 @@ type Defaults struct {
 	Variables map[string]any
 }
 
-// missingFileMessage explains what gondola.yaml is for, since a user who
-// sees it may be running Gondola for the first time.
-const missingFileMessage = FileName + " not found in the current directory; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url"
+// missingFileFormat explains what gondola.yaml is for, since a user who
+// sees it may be running Gondola for the first time. It names the absolute
+// project directory because the usual cause is running Gondola from the
+// wrong folder.
+const missingFileFormat = FileName + " not found in %s; it holds the site settings and must set at least config.site-name, config.version and config.canonical-url"
 
 // Load reads gondola.yaml from projectDir and parses it with Parse.
 func Load(projectDir string) (Config, error) {
 	src, err := os.ReadFile(filepath.Join(projectDir, FileName))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Config{}, errors.New(missingFileMessage)
+		return Config{}, fmt.Errorf(missingFileFormat, displayedDir(projectDir))
 	}
 	if err != nil {
 		return Config{}, fmt.Errorf("reading %s: %w", FileName, err)
 	}
 	return parseFile(src, ignoresLetterCase(projectDir))
+}
+
+// displayedDir returns projectDir as an absolute path written with "/", or
+// as given when the working directory cannot be found.
+func displayedDir(projectDir string) string {
+	absoluteDir, err := filepath.Abs(projectDir)
+	if err != nil {
+		return filepath.ToSlash(projectDir)
+	}
+	return filepath.ToSlash(absoluteDir)
 }
 
 // ignoresLetterCase reports whether the file system of projectDir ignores
