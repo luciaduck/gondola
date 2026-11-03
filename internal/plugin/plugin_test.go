@@ -328,16 +328,16 @@ func TestRunContract(t *testing.T) {
 			}
 			absoluteTempDir := filepath.Join(projectDir, filepath.FromSlash(test.tempDir))
 			want := []plugintest.Record{{
-				Args:       []string{absoluteTempDir},
-				WorkingDir: resolvedPath(t, projectDir),
-				Stdin:      "",
+				Args:  []string{absoluteTempDir},
+				Stdin: "",
 				Variables: map[string]string{
 					"GONDOLA_OUTPUT":         absoluteTempDir,
 					"GONDOLA_MODE":           string(test.mode),
 					"GONDOLA_TEST_INHERITED": "kept",
 				},
 			}}
-			if got := plugintest.ReadRecords(t, recordPath); !reflect.DeepEqual(got, want) {
+			got := withoutWorkingDirs(t, plugintest.ReadRecords(t, recordPath), projectDir)
+			if !reflect.DeepEqual(got, want) {
 				t.Errorf("records differ\n got %+v\nwant %+v", got, want)
 			}
 			wantPrinted := []string{"Executing " + check + " in " + test.tempDir}
@@ -584,15 +584,28 @@ func TestRunNoPlugins(t *testing.T) {
 	}
 }
 
-// resolvedPath returns diskPath with its symbolic links resolved, as the
-// working directory of a process reports it.
-func resolvedPath(t testing.TB, diskPath string) string {
+// withoutWorkingDirs checks that every record's working directory is
+// projectDir and returns the records with it cleared, so that the rest can
+// be compared field by field. The directory is compared with os.SameFile,
+// because the same directory can be written differently: macOS reports
+// /private/var for /var, and Windows keeps a short name such as RUNNER~1
+// where filepath.EvalSymlinks gives runneradmin.
+func withoutWorkingDirs(t testing.TB, records []plugintest.Record, projectDir string) []plugintest.Record {
 	t.Helper()
-	resolved, err := filepath.EvalSymlinks(diskPath)
+	projectInfo, err := os.Stat(projectDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return resolved
+	cleared := make([]plugintest.Record, 0, len(records))
+	for _, record := range records {
+		workingInfo, err := os.Stat(record.WorkingDir)
+		if err != nil || !os.SameFile(workingInfo, projectInfo) {
+			t.Errorf("working directory %q, want the project directory %q", record.WorkingDir, projectDir)
+		}
+		record.WorkingDir = ""
+		cleared = append(cleared, record)
+	}
+	return cleared
 }
 
 func mkdir(t testing.TB, dir string) {

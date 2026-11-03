@@ -52,11 +52,16 @@ type Options struct {
 // Compiler compiles the entry points of one build. Create it with Start and
 // close it with Close.
 type Compiler struct {
-	projectDir   string
-	partialDirs  []string // absolute paths
-	style        godartsass.OutputStyle
-	printWarning func(text string)
-	transpiler   *godartsass.Transpiler
+	projectDir string
+	// resolvedProjectDir is projectDir with symbolic links resolved and, on
+	// Windows, short names such as RUNNER~1 expanded: Dart Sass reports the
+	// partials it finds by their long names. It is "" when it cannot be
+	// found or equals projectDir.
+	resolvedProjectDir string
+	partialDirs        []string // absolute paths
+	style              godartsass.OutputStyle
+	printWarning       func(text string)
+	transpiler         *godartsass.Transpiler
 
 	// printedWarnings holds the warnings printed in this build, so that a
 	// partial used by several entry points does not repeat its warnings.
@@ -85,12 +90,17 @@ func Start(options Options) (*Compiler, error) {
 	if err != nil {
 		return nil, err
 	}
+	resolvedProjectDir, err := filepath.EvalSymlinks(projectDir)
+	if err != nil || resolvedProjectDir == projectDir {
+		resolvedProjectDir = ""
+	}
 	compiler := &Compiler{
-		projectDir:      projectDir,
-		partialDirs:     partialDirs,
-		style:           style,
-		printWarning:    options.PrintWarning,
-		printedWarnings: map[string]bool{},
+		projectDir:         projectDir,
+		resolvedProjectDir: resolvedProjectDir,
+		partialDirs:        partialDirs,
+		style:              style,
+		printWarning:       options.PrintWarning,
+		printedWarnings:    map[string]bool{},
 	}
 	transpiler, err := godartsass.Start(godartsass.Options{
 		DartSassEmbeddedFilename: options.ExecutablePath,
@@ -300,13 +310,20 @@ func (c *Compiler) fileText(filePath, entryFilePath, entryText string) (string, 
 }
 
 // displayedPath returns filePath relative to the project root, with "/", or
-// the absolute path with "/" when it lies outside the project.
+// the absolute path with "/" when it lies outside the project. The root is
+// tried as written and then resolved, since Dart Sass may name a file either
+// way.
 func (c *Compiler) displayedPath(filePath string) string {
-	relativePath, err := filepath.Rel(c.projectDir, filePath)
-	if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
-		return filepath.ToSlash(filePath)
+	for _, rootDir := range []string{c.projectDir, c.resolvedProjectDir} {
+		if rootDir == "" {
+			continue
+		}
+		relativePath, err := filepath.Rel(rootDir, filePath)
+		if err == nil && relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(relativePath)
+		}
 	}
-	return filepath.ToSlash(relativePath)
+	return filepath.ToSlash(filePath)
 }
 
 // Close stops Dart Sass.

@@ -112,15 +112,15 @@ func FuzzRun(f *testing.F) {
 			t.Errorf("stderr %q, want %q", gotStderr.Bytes(), stderr)
 		}
 		want := []plugintest.Record{{
-			Args:       []string{absoluteTempDir},
-			WorkingDir: resolvedPath(t, projectDir),
+			Args: []string{absoluteTempDir},
 			Variables: map[string]string{
 				"GONDOLA_OUTPUT":         absoluteTempDir,
 				"GONDOLA_MODE":           string(mode),
 				"GONDOLA_TEST_INHERITED": inherited,
 			},
 		}}
-		if got := plugintest.ReadRecords(t, recordPath); !reflect.DeepEqual(got, want) {
+		got := withoutWorkingDirs(t, plugintest.ReadRecords(t, recordPath), projectDir)
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("records differ\n got %+v\nwant %+v", got, want)
 		}
 		wantPrinted := []string{"Executing " + fuzzPluginPath + " in " + tempDir}

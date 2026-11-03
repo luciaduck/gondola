@@ -443,3 +443,50 @@ func TestDisplayedPath(t *testing.T) {
 		}
 	}
 }
+
+// TestDisplayedPathResolvedRoot checks that a file Dart Sass names through
+// the resolved project directory is shown relative to the project too, as
+// on Windows when the project is reached through a short name.
+func TestDisplayedPathResolvedRoot(t *testing.T) {
+	baseDir := t.TempDir()
+	writtenDir := filepath.Join(baseDir, "RUNNER~1", "site")
+	resolvedDir := filepath.Join(baseDir, "runneradmin", "site")
+	compiler := &Compiler{projectDir: writtenDir, resolvedProjectDir: resolvedDir}
+	elsewhere := filepath.Join(baseDir, "runneradmin", "other", "x.scss")
+	tests := []struct {
+		filePath string
+		want     string
+	}{
+		{filepath.Join(writtenDir, "assets", "main.scss"), "assets/main.scss"},
+		{filepath.Join(resolvedDir, "_components", "sass", "_broken.scss"), "_components/sass/_broken.scss"},
+		{elsewhere, filepath.ToSlash(elsewhere)},
+	}
+	for _, test := range tests {
+		if got := compiler.displayedPath(test.filePath); got != test.want {
+			t.Errorf("displayedPath(%q) = %q, want %q", test.filePath, got, test.want)
+		}
+	}
+}
+
+// TestStartResolvesProjectDir checks that Start keeps the resolved project
+// directory when it differs from the written one, here through a link.
+func TestStartResolvesProjectDir(t *testing.T) {
+	executablePath := requireSass(t)
+	realDir := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("cannot create a symbolic link: %v", err)
+	}
+	compiler, err := Start(Options{ProjectDir: linkDir, ExecutablePath: executablePath, Input: defaultInput(), Style: Compressed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer compiler.Close()
+	wantResolved, err := filepath.EvalSymlinks(realDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compiler.resolvedProjectDir != wantResolved {
+		t.Errorf("resolvedProjectDir = %q, want %q", compiler.resolvedProjectDir, wantResolved)
+	}
+}
