@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -22,7 +23,7 @@ import (
 const maxFuzzPathBytes = 120
 
 // fuzzPluginPath is where the fuzz targets install the plugin program.
-const fuzzPluginPath = "tools/fuzz"
+var fuzzPluginPath = plugintest.ProgramPath("tools/fuzz")
 
 // isFuzzableTempDir reports whether tempDir can be a temp output: a clean
 // relative path written with "/", without "..", that the disk can hold and
@@ -179,13 +180,6 @@ func FuzzCheck(f *testing.F) {
 		if len(pluginPath) > maxFuzzPathBytes || strings.EqualFold(elements[0], config.FileName) {
 			t.Skip()
 		}
-		// config accepts a NUL character in every path, which no file name
-		// can hold; the preflight then reports "invalid argument". Left out
-		// until config refuses control characters in paths, planned for M14
-		// (testdata/fuzz/FuzzCheck/ea903adeb6df0766).
-		if strings.ContainsRune(pluginPath, 0) {
-			t.Skip()
-		}
 		projectDir := t.TempDir()
 		target := filepath.Join(projectDir, filepath.FromSlash(pluginPath))
 		want, ok := createKind(t, projectDir, target, elements, int(kind)%kindCount)
@@ -247,6 +241,10 @@ func createKind(t *testing.T, projectDir, target string, elements []string, kind
 	case kindMissing, kindLinkToNothing, kindParentIsFile:
 		return missing, true
 	case kindNotExecutable:
+		// Windows has no execute bit, so Check accepts the file there.
+		if runtime.GOOS == "windows" {
+			return "", true
+		}
 		return notExecutable, true
 	case kindDirectory:
 		return directory, true

@@ -27,10 +27,19 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// firstPlugin and secondPlugin are the plugins of pluginConfig, named as
+// this system starts them.
+var (
+	firstPlugin  = plugintest.ProgramPath("tools/first")
+	secondPlugin = plugintest.ProgramPath("tools/second")
+)
+
+// pluginConfigLine is the line of pluginConfig that lists the plugins.
+var pluginConfigLine = "  plugin: [" + firstPlugin + ", " + secondPlugin + "]\n"
+
 // pluginConfig is minimalConfig with the sitemap on, one passthrough file,
-// and the plugins tools/first and tools/second.
-const pluginConfig = minimalConfig + "  sitemap: true\n  plugin: [tools/first, tools/second]\n" +
-	"output:\n  passthrough: [favicon.ico]\n"
+// and the plugins firstPlugin and secondPlugin.
+var pluginConfig = minimalConfig + "  sitemap: true\n" + pluginConfigLine + "output:\n  passthrough: [favicon.ico]\n"
 
 // TestBuildPlugins checks stage 8 (SPEC §5.13): the plugins run in order
 // on the finished temp output, sitemap included, after the sitemap line and
@@ -44,13 +53,13 @@ func TestBuildPlugins(t *testing.T) {
 		"favicon.ico":  "icon",
 	})
 	recordPath := filepath.Join(t.TempDir(), "records")
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, firstPlugin, plugintest.Behavior{
 		Name:       "first",
 		RecordPath: recordPath,
 		WriteFiles: map[string][]byte{"index.html": []byte("<p>minified</p>"), "feeds/feed.json": []byte("{}")},
 		Stdout:     []byte("first says hello\n"),
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/second", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, secondPlugin, plugintest.Behavior{
 		Name:            "second",
 		RecordPath:      recordPath,
 		RecordVariables: []string{"GONDOLA_OUTPUT", "GONDOLA_MODE"},
@@ -65,9 +74,9 @@ func TestBuildPlugins(t *testing.T) {
 \gondola/ Shaping ./_site.temp/about.html from ./about.html
 \gondola/ Shaping ./_site.temp/index.html from ./index.html
 (sitemap) 2 pages were listed (there is no robots.txt)
-\gondola/ Executing tools/first in _site.temp
+\gondola/ Executing ` + firstPlugin + ` in _site.temp
 first says hello
-\gondola/ Executing tools/second in _site.temp
+\gondola/ Executing ` + secondPlugin + ` in _site.temp
 \gondola/ Shipping _site.temp to _site
 \gondola/ Built 2 files and Copied 1 in 0.04 seconds (13.33ms each, v0.0.1)
 `
@@ -117,23 +126,23 @@ func TestBuildPluginFails(t *testing.T) {
 		"_site/index.html": "<p>old</p>\n",
 	})
 	recordPath := filepath.Join(t.TempDir(), "records")
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, firstPlugin, plugintest.Behavior{
 		Name:       "first",
 		RecordPath: recordPath,
 		WriteFiles: map[string][]byte{"half-done.txt": []byte("x")},
 		Stderr:     []byte("first: something went wrong\n"),
 		ExitCode:   3,
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/second", plugintest.Behavior{Name: "second", RecordPath: recordPath})
+	plugintest.Install(t, testProgram, projectDir, secondPlugin, plugintest.Behavior{Name: "second", RecordPath: recordPath})
 	result := runBuild(t, projectDir)
-	if want := []string{`plugin "tools/first" failed: exit status 3`}; !reflect.DeepEqual(result.errorTexts(), want) {
+	if want := []string{fmt.Sprintf("plugin %q failed: exit status 3", firstPlugin)}; !reflect.DeepEqual(result.errorTexts(), want) {
 		t.Errorf("errors %q, want %q", result.errorTexts(), want)
 	}
 	checkNotPublished(t, projectDir, result)
 	if want := "first: something went wrong\n"; result.stderr != want {
 		t.Errorf("stderr %q, want %q", result.stderr, want)
 	}
-	if strings.Contains(result.stdout, "tools/second") {
+	if strings.Contains(result.stdout, secondPlugin) {
 		t.Errorf("the second plugin was announced after the first failed:\n%s", result.stdout)
 	}
 	if records := plugintest.ReadRecords(t, recordPath); len(records) != 1 {
@@ -155,9 +164,10 @@ func TestBuildPluginPreflight(t *testing.T) {
 		"_site/index.html":       "<p>old</p>\n",
 		"_site.temp/leftover.md": "from a failed build",
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{})
+	plugintest.Install(t, testProgram, projectDir, firstPlugin, plugintest.Behavior{})
 	result := runBuild(t, projectDir)
-	want := []string{`gondola.yaml:7:25: config.plugin "tools/second" does not exist; please check the path`}
+	secondColumn := strings.Index(pluginConfigLine, secondPlugin) + 1
+	want := []string{fmt.Sprintf("gondola.yaml:7:%d: config.plugin %q does not exist; please check the path", secondColumn, secondPlugin)}
 	if !reflect.DeepEqual(result.errorTexts(), want) {
 		t.Errorf("errors %q, want %q", result.errorTexts(), want)
 	}
@@ -176,12 +186,12 @@ func TestBuildPluginPreflight(t *testing.T) {
 // temp output makes publishing fail (M11, Q6).
 func TestBuildPluginRemovesTempOutput(t *testing.T) {
 	projectDir := writeProject(t, map[string]string{
-		"gondola.yaml": minimalConfig + "  plugin: [tools/first]\n",
+		"gondola.yaml": minimalConfig + "  plugin: [" + firstPlugin + "]\n",
 		"index.html":   "<p>home</p>\n",
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{RemoveOutput: true})
+	plugintest.Install(t, testProgram, projectDir, firstPlugin, plugintest.Behavior{RemoveOutput: true})
 	result := runBuild(t, projectDir)
-	want := []string{"renaming _site.temp to _site: no such file or directory"}
+	want := []string{"renaming _site.temp to _site: " + systemErrorText(t, missingFileError)}
 	if !reflect.DeepEqual(result.errorTexts(), want) {
 		t.Errorf("errors %q, want %q", result.errorTexts(), want)
 	}

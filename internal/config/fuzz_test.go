@@ -130,8 +130,9 @@ func checkInvariants(t *testing.T, config Config, src []byte) {
 	deletedDirs := []string{config.Output.Dir, config.Output.TempDir()}
 	allPaths := append(append(append([]string{input.ContentDir}, inputDirs...), deletedDirs...), settings.PluginPaths...)
 	for _, written := range allPaths {
-		if written == "" || path.Clean(written) != written || strings.HasPrefix(written, "/") || hasParentElement(written) {
-			t.Fatalf("path %q is not clean and relative", written)
+		if written == "" || path.Clean(written) != written || strings.HasPrefix(written, "/") || hasParentElement(written) ||
+			PathCharacterProblem(written) != "" {
+			t.Fatalf("path %q is not clean and relative, or has a character config refuses", written)
 		}
 	}
 	directories := pathComparer{ignoresLetterCase: config.IgnoresLetterCase}

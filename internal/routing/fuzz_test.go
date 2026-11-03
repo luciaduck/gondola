@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -90,6 +91,13 @@ func FuzzRoute(f *testing.F) {
 func checkError(t *testing.T, page Page, err error) {
 	t.Helper()
 	if strings.HasPrefix(err.Error(), "routing "+page.SourcePath+": content path ") {
+		return
+	}
+	// On Windows "\" separates directories, so the last check of Route
+	// refuses a content path such as `a\..\..\x.md`; scan never produces
+	// one there, since a Windows file name cannot hold "\".
+	if runtime.GOOS == "windows" && strings.Contains(page.ContentPath, `\`) &&
+		strings.HasPrefix(err.Error(), "routing "+page.SourcePath+": output path ") {
 		return
 	}
 	var diagErr *diag.Error

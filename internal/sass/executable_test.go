@@ -126,13 +126,16 @@ func checkError(t *testing.T, err error, wantErr string) {
 	}
 }
 
+// TestFindExecutableNotFound checks the message, which names sass.bat on
+// Windows.
 func TestFindExecutableNotFound(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the message names sass.bat on Windows")
-	}
 	t.Setenv("PATH", t.TempDir())
 	_, err := FindExecutable("assets/main.scss")
-	checkError(t, err, `Dart Sass is needed to compile assets/main.scss, but "sass" was not found in PATH; please install Dart Sass 1.63.0 or newer from https://sass-lang.com/install, or set config.sass to false`)
+	shownName := "sass"
+	if runtime.GOOS == "windows" {
+		shownName = "sass.bat"
+	}
+	checkError(t, err, `Dart Sass is needed to compile assets/main.scss, but "`+shownName+`" was not found in PATH; please install Dart Sass 1.63.0 or newer from https://sass-lang.com/install, or set config.sass to false`)
 }
 
 // TestFindExecutableFakes puts small shell scripts named sass in PATH, in

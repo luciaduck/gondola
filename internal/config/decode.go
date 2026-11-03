@@ -673,14 +673,16 @@ func listItem(label, what string, entry *yaml.Node) (string, error) {
 // directory and returns it cleaned and written with "/". Any ".." is
 // refused, even one that would stay inside, as SPEC §4 asks.
 func cleanPath(label string, node *yaml.Node, written string) (string, error) {
-	slashed := filepath.ToSlash(written)
+	if problem := PathCharacterProblem(written); problem != "" {
+		return "", errorAt(node, "%s %q %s", label, written, problem)
+	}
 	// On Windows, "/x" and "C:x" are not absolute for filepath.IsAbs, but
 	// they do not stay inside the project either.
-	isAbsolute := filepath.IsAbs(written) || filepath.VolumeName(written) != "" || strings.HasPrefix(slashed, "/")
-	if isAbsolute || hasParentElement(slashed) {
+	isAbsolute := filepath.IsAbs(written) || filepath.VolumeName(written) != "" || strings.HasPrefix(written, "/")
+	if isAbsolute || hasParentElement(written) {
 		return "", errorAt(node, "%s %q is not allowed: paths are relative to the project directory and may not contain \"..\" or be absolute", label, written)
 	}
-	return path.Clean(slashed), nil
+	return path.Clean(written), nil
 }
 
 func hasParentElement(slashedPath string) bool {

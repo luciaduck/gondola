@@ -99,6 +99,16 @@ func BuildProgram() (programPath string, err error) {
 	return programPath, nil
 }
 
+// ProgramPath returns pluginPath, written with "/", as a test plugin must be
+// named on this system: Windows starts a program only through an extension
+// it knows, so "tools/check" becomes "tools/check.exe" there.
+func ProgramPath(pluginPath string) string {
+	if runtime.GOOS == "windows" {
+		return pluginPath + ".exe"
+	}
+	return pluginPath
+}
+
 // Install copies the program at programPath to pluginPath, relative to
 // projectDir and written with "/", makes it executable, and writes behavior
 // next to it.

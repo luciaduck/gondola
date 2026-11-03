@@ -343,9 +343,19 @@ func TestLoadSymbolicLinks(t *testing.T) {
 
 func skipUnlessNamesMayBeAnyBytes(t *testing.T) {
 	t.Helper()
-	probe := filepath.Join(t.TempDir(), "caf\xe9")
-	if err := os.WriteFile(probe, nil, 0o644); err != nil {
+	const notUTF8Name = "caf\xe9"
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, notUTF8Name), nil, 0o644); err != nil {
 		t.Skipf("the file system refuses names that are not UTF-8: %v", err)
+	}
+	// Windows stores names as UTF-16, and Go writes U+FFFD there for each
+	// byte that is not UTF-8 instead of failing.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != notUTF8Name {
+		t.Skip("the file system does not keep names that are not UTF-8")
 	}
 }
 

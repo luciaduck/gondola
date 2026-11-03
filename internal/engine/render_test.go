@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -118,7 +119,6 @@ func TestRenderBodyErrors(t *testing.T) {
 		// same file.
 		dir + "self-import-dots.jet": `{{ import "/a/../self-import-dots.jet" }}`,
 		dir + "utf16.jet":            "\xff\xfex\x00",
-		dir + "dir/x.jet":            "",
 	}
 	tests := []struct {
 		name string
@@ -161,8 +161,6 @@ func TestRenderBodyErrors(t *testing.T) {
 			`_components/includes/self-import-dots.jet:1: the templates form a cycle: self-import-dots.jet → self-import-dots.jet; please remove one of the extends or import statements (while rendering blog/post.md)`},
 		{"import of itself", `{{ import "self-import.jet" }}`,
 			`_components/includes/self-import.jet:1: the templates form a cycle: self-import.jet → self-import.jet; please remove one of the extends or import statements (while rendering blog/post.md)`},
-		{"backslash", `{{ include "dir\\x.jet" }}`,
-			`blog/post.md:4: template name "dir\\x.jet" contains "\\"; please separate directories with "/"`},
 		{"control character", `{{ include "a` + "\t" + `b" }}`,
 			`blog/post.md:4: template name "a\tb" contains a control character (U+0009); please remove it`},
 		{"template saved as UTF-16", `{{ include "utf16.jet" }}`,
@@ -173,6 +171,44 @@ func TestRenderBodyErrors(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := engine.RenderBody(testPage(), testGlobals(), []byte(test.body), 3)
 			checkDiagError(t, err, test.want)
+		})
+	}
+}
+
+// TestRenderBodyBackslashInName checks "\" in an included name (M14, Q5).
+// The loader refuses it, but on Windows Jet turns it into "/" before the
+// loader sees the name, so there it works as "/" would.
+func TestRenderBodyBackslashInName(t *testing.T) {
+	engine := newProject(t, map[string]string{
+		defaultTemplateDir + "/dir/x.jet": "X",
+		defaultTemplateDir + "/a/b.md":    "B",
+	})
+	tests := []struct {
+		name string
+		body string
+		// want is the error, or on Windows the rendered body.
+		want string
+	}{
+		{"include", `{{ include "dir\\x.jet" }}`,
+			`blog/post.md:4: template name "dir\\x.jet" contains "\\"; please separate directories with "/"`},
+		{"includeIfExists", `{{ includeIfExists("a\\b.md") }}`,
+			`blog/post.md: template name "a\\b.md" contains "\\"; please separate directories with "/"`},
+	}
+	// Goldmark runs later, on the whole page, so the fragment is still Markdown.
+	windowsBodies := map[string]string{"include": "X", "includeIfExists": "B"}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body, err := engine.RenderBody(testPage(), testGlobals(), []byte(test.body), 3)
+			if runtime.GOOS != "windows" {
+				checkDiagError(t, err, test.want)
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got, want := string(body), windowsBodies[test.name]; got != want {
+				t.Errorf("body %q, want %q", got, want)
+			}
 		})
 	}
 }
@@ -345,8 +381,6 @@ func TestRenderReportsIgnoredFailures(t *testing.T) {
 		{"includeIfExists of a template", `{{ includeIfExists("fine.md") }}`, ""},
 		{"includeIfExists of a broken fragment", `{{ includeIfExists("broken.md") }}`,
 			`_components/includes/broken.md:1:1: unclosed fence: no matching ":::" closing marker (while rendering blog/post.md)`},
-		{"includeIfExists of a bad name", `{{ includeIfExists("a\\b.md") }}`,
-			`blog/post.md: template name "a\\b.md" contains "\\"; please separate directories with "/"`},
 		{"try around a broken fragment", `{{ try }}{{ include "broken.md" }}{{ end }}`,
 			`_components/includes/broken.md:1:1: unclosed fence: no matching ":::" closing marker (while rendering blog/post.md)`},
 	}

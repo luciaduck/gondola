@@ -268,6 +268,10 @@ func TestScanErrors(t *testing.T) {
 	runScanErrorTests(t, []scanErrorTest{
 		{"backslash", "output:\n  passthrough: ['assets\\img\\']\n", nil,
 			at + `output.passthrough "assets\\img\\" contains "\"; please separate directories with "/"`},
+		{"tab from double quotes", "output:\n  passthrough: [\"assets\\tmp/\"]\n", nil,
+			at + `output.passthrough "assets\tmp/" contains a tab; inside double quotes YAML reads "\t" as a tab; please separate directories with "/"`},
+		{"control character", "output:\n  passthrough: [\"a\\x7fb\"]\n", nil,
+			at + `output.passthrough "a\x7fb" contains a control character (U+007F); please remove it`},
 		{"parent directory", "output:\n  passthrough: [../secrets/]\n", nil, at + `output.passthrough "../secrets/" ` + notAllowed},
 		{"parent directory after the root", "output:\n  passthrough: [/../x]\n", nil, at + `output.passthrough "/../x" ` + notAllowed},
 		{"parent directory that stays inside", "output:\n  passthrough: [a/../b]\n", nil, at + `output.passthrough "a/../b" ` + notAllowed},
@@ -306,8 +310,24 @@ func TestScanErrors(t *testing.T) {
 
 		{"content directory missing", "input:\n  content: src\n", []string{"index.md"}, `gondola.yaml:6:12: input.content "src" does not exist`},
 		{"content directory is a file", "input:\n  content: src\n", []string{"src"}, `gondola.yaml:6:12: input.content "src" is a file, not a directory`},
-		{"content directory differs in letter case", "input:\n  content: Src\n", []string{"src/index.md"}, `gondola.yaml:6:12: input.content "Src" does not exist`},
 	})
+}
+
+// TestScanContentDirectoryLetterCase checks that input.content is found as
+// the file system finds it: "Src" names "src" only where letter case is
+// ignored, as on Windows and macOS.
+func TestScanContentDirectoryLetterCase(t *testing.T) {
+	const config = "input:\n  content: Src\n"
+	if !fileSystemIgnoresCase(t) {
+		runScanErrorTests(t, []scanErrorTest{
+			{"differs in letter case", config, []string{"src/index.md"}, `gondola.yaml:6:12: input.content "Src" does not exist`},
+		})
+		return
+	}
+	projectDir := makeTree(t, "src/index.md")
+	if _, err := Scan(projectDir, parseConfig(t, config)); err != nil {
+		t.Errorf("Scan returned error: %v", err)
+	}
 }
 
 func TestScanOutputCollisions(t *testing.T) {
@@ -555,9 +575,19 @@ func TestScanEntersOnlyNeededDirectories(t *testing.T) {
 // file names that are not valid UTF-8, as APFS on macOS and NTFS do.
 func skipUnlessNamesMayBeAnyBytes(t *testing.T) {
 	t.Helper()
-	probe := filepath.Join(t.TempDir(), "caf\xe9")
-	if err := os.WriteFile(probe, nil, 0o644); err != nil {
+	const notUTF8Name = "caf\xe9"
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, notUTF8Name), nil, 0o644); err != nil {
 		t.Skipf("the file system refuses names that are not UTF-8: %v", err)
+	}
+	// Windows stores names as UTF-16, and Go writes U+FFFD there for each
+	// byte that is not UTF-8 instead of failing.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != notUTF8Name {
+		t.Skip("the file system does not keep names that are not UTF-8")
 	}
 }
 

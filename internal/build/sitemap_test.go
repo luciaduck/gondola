@@ -187,7 +187,7 @@ func TestBuildSitemapErrors(t *testing.T) {
 				"gondola.yaml": withSitemap,
 				"robots.html":  "---\npermalink: /robots.txt/\n---\n",
 			},
-			wantErrors: []string{"reading _site.temp/robots.txt: is a directory"},
+			wantErrors: []string{"reading _site.temp/robots.txt: " + systemErrorText(t, readDirectoryError)},
 		},
 	}
 	for _, test := range tests {

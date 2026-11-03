@@ -219,7 +219,7 @@ func (s *devServer) checkConfig(cfg config.Config) error {
 func (s *devServer) emptyOutputDir() error {
 	diskDir := s.outputDiskDir()
 	if err := os.RemoveAll(diskDir); err != nil {
-		return fmt.Errorf("deleting %s: %w", s.outputDir, withoutPath(err))
+		return fmt.Errorf("deleting %s: %w%s", s.outputDir, withoutPath(err), build.InUseHint(err, s.outputDir))
 	}
 	if err := os.MkdirAll(diskDir, outputDirPermissions); err != nil {
 		return fmt.Errorf("creating %s: %w", s.outputDir, withoutPath(err))

@@ -232,7 +232,7 @@ func (b *builder) start() error {
 	}
 	for _, dir := range []string{b.cfg.Output.Dir, b.cfg.Output.TempDir()} {
 		if err := os.RemoveAll(b.diskPath(dir)); err != nil {
-			return fmt.Errorf("deleting %s: %w", dir, withoutPath(err))
+			return fmt.Errorf("deleting %s: %w%s", dir, withoutPath(err), InUseHint(err, dir))
 		}
 	}
 	if err := os.MkdirAll(b.diskPath(b.cfg.Output.TempDir()), directoryPermissions); err != nil {
@@ -343,15 +343,15 @@ func (b *builder) runPlugins() error {
 
 // publish is stage 9: it replaces the output directory with the temp
 // output. The output is deleted first because renaming over a directory
-// fails on Windows, and everywhere when the directory is not empty; in
-// gondola serve it exists, emptied by sandolo.
+// fails on Windows, and everywhere when the directory is not empty. Stage 1
+// has deleted it already, but publishing does not rely on that.
 func (b *builder) publish() error {
 	outputDir, tempDir := b.cfg.Output.Dir, b.cfg.Output.TempDir()
 	if err := os.RemoveAll(b.diskPath(outputDir)); err != nil {
-		return fmt.Errorf("deleting %s: %w", outputDir, withoutPath(err))
+		return fmt.Errorf("deleting %s: %w%s", outputDir, withoutPath(err), InUseHint(err, outputDir))
 	}
 	if err := os.Rename(b.diskPath(tempDir), b.diskPath(outputDir)); err != nil {
-		return fmt.Errorf("renaming %s to %s: %w", tempDir, outputDir, withoutPath(err))
+		return fmt.Errorf("renaming %s to %s: %w%s", tempDir, outputDir, withoutPath(err), InUseHint(err, tempDir+" or "+outputDir))
 	}
 	b.options.Printer.Shipping(tempDir, outputDir)
 	return nil

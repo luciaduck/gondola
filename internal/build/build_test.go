@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -200,7 +201,7 @@ func TestBuildPagesErrors(t *testing.T) {
 				"blog/post.html": "<p>post</p>\n",
 			},
 			wantErrors: []string{
-				"blog/post.html: writing _site.temp/blog/post.html: not a directory",
+				"blog/post.html: writing _site.temp/blog/post.html: " + systemErrorText(t, fileAsDirectoryError),
 			},
 			wantShaping: []string{"\\gondola/ Shaping ./_site.temp/blog from ./about.html"},
 		},
@@ -441,6 +442,9 @@ func TestBuildFailureDeletesOldOutput(t *testing.T) {
 // TestBuildPassthroughCopiesContentsOnly checks that a copy does not keep
 // the source's permissions, so the output does not depend on them.
 func TestBuildPassthroughCopiesContentsOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no Unix permission bits; Go reports 0o666 for every writable file")
+	}
 	projectDir := writeProject(t, map[string]string{
 		"gondola.yaml": minimalConfig + "output:\n  passthrough: [run.sh]\n",
 		"run.sh":       "#!/bin/sh\n",

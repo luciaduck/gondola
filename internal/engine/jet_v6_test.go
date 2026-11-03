@@ -8,6 +8,7 @@ package engine
 import (
 	"bytes"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -129,11 +130,12 @@ func TestJetLiteralBraces(t *testing.T) {
 // the directory of the template that holds it, cleans it (so ".." cannot
 // leave its root), then tries the extensions in order.
 func TestJetResolvesNames(t *testing.T) {
-	tests := []struct {
+	type jetNameTest struct {
 		name      string // the name the including template is parsed under
 		src       string
 		wantAsked []string
-	}{
+	}
+	tests := []jetNameTest{
 		{"/blog/post.md", `{{ include "snippets/x.md" }}`, []string{"/blog/snippets/x.md", "/blog/snippets/x.md.jet", "/blog/snippets/x.md.html"}},
 		{"/post.md", `{{ include "snippets/x.md" }}`, []string{"/snippets/x.md"}},
 		{"/blog/post.md", `{{ include "/snippets/x.md" }}`, []string{"/snippets/x.md"}},
@@ -143,8 +145,12 @@ func TestJetResolvesNames(t *testing.T) {
 		// An absolute name is passed as written, ".." included: the loader
 		// must clean it.
 		{"/blog/post.md", `{{ include "/../x.md" }}`, []string{"/../x.md", "/../x.md.jet", "/../x.md.html"}},
-		// "\" is not a separator on Linux; on Windows Jet turns it into "/".
-		{"/post.md", `{{ include "a\\x.md" }}`, []string{"/a\\x.md", "/a\\x.md.jet", "/a\\x.md.html"}},
+	}
+	// "\" is not a separator on Linux; on Windows Jet turns it into "/".
+	if runtime.GOOS == "windows" {
+		tests = append(tests, jetNameTest{"/post.md", `{{ include "a\\x.md" }}`, []string{"/a/x.md", "/a/x.md.jet", "/a/x.md.html"}})
+	} else {
+		tests = append(tests, jetNameTest{"/post.md", `{{ include "a\\x.md" }}`, []string{"/a\\x.md", "/a\\x.md.jet", "/a\\x.md.html"}})
 	}
 	for _, test := range tests {
 		loader := &memoryLoader{files: map[string]string{"/snippets/x.md": "X", "/header.html": "H"}}

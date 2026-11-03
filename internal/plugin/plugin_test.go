@@ -297,6 +297,7 @@ func TestCheckUnreadableDirectory(t *testing.T) {
 // inherited environment, the project root as working directory, and an
 // empty standard input.
 func TestRunContract(t *testing.T) {
+	check := plugintest.ProgramPath("tools/check")
 	tests := []struct {
 		name    string
 		mode    Mode
@@ -311,11 +312,11 @@ func TestRunContract(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			projectDir := t.TempDir()
 			recordPath := filepath.Join(t.TempDir(), "records")
-			plugintest.Install(t, testProgram, projectDir, "tools/check", plugintest.Behavior{
+			plugintest.Install(t, testProgram, projectDir, check, plugintest.Behavior{
 				RecordPath:      recordPath,
 				RecordVariables: []string{"GONDOLA_OUTPUT", "GONDOLA_MODE", "GONDOLA_TEST_INHERITED"},
 			})
-			result := runPlugins(t, projectDir, []string{"tools/check"}, Options{
+			result := runPlugins(t, projectDir, []string{check}, Options{
 				TempDir: test.tempDir,
 				Mode:    test.mode,
 				// Values of Gondola's variables that were already set are
@@ -339,7 +340,7 @@ func TestRunContract(t *testing.T) {
 			if got := plugintest.ReadRecords(t, recordPath); !reflect.DeepEqual(got, want) {
 				t.Errorf("records differ\n got %+v\nwant %+v", got, want)
 			}
-			wantPrinted := []string{"Executing tools/check in " + test.tempDir}
+			wantPrinted := []string{"Executing " + check + " in " + test.tempDir}
 			if !reflect.DeepEqual(result.printed, wantPrinted) {
 				t.Errorf("printed %q, want %q", result.printed, wantPrinted)
 			}
@@ -350,13 +351,14 @@ func TestRunContract(t *testing.T) {
 // TestRunNilEnvironment checks that a nil Environment gives the plugin only
 // Gondola's two variables.
 func TestRunNilEnvironment(t *testing.T) {
+	check := plugintest.ProgramPath("tools/check")
 	projectDir := t.TempDir()
 	recordPath := filepath.Join(t.TempDir(), "records")
-	plugintest.Install(t, testProgram, projectDir, "tools/check", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, check, plugintest.Behavior{
 		RecordPath:      recordPath,
 		RecordVariables: []string{"GONDOLA_MODE", "PATH", "HOME"},
 	})
-	result := runPlugins(t, projectDir, []string{"tools/check"}, Options{})
+	result := runPlugins(t, projectDir, []string{check}, Options{})
 	if result.err != nil {
 		t.Fatalf("%v\n%s", result.err, result.stderr)
 	}
@@ -370,12 +372,13 @@ func TestRunNilEnvironment(t *testing.T) {
 // TestRunIgnoresPath checks that a plugin named without a directory is the
 // file of the project root, even when PATH holds a program of that name.
 func TestRunIgnoresPath(t *testing.T) {
+	minify := plugintest.ProgramPath("minify")
 	projectDir := t.TempDir()
 	pathDir := t.TempDir()
 	recordPath := filepath.Join(t.TempDir(), "records")
-	plugintest.Install(t, testProgram, projectDir, "minify", plugintest.Behavior{Name: "project", RecordPath: recordPath})
-	plugintest.Install(t, testProgram, pathDir, "minify", plugintest.Behavior{Name: "path", RecordPath: recordPath})
-	result := runPlugins(t, projectDir, []string{"minify"}, Options{Environment: []string{"PATH=" + pathDir}})
+	plugintest.Install(t, testProgram, projectDir, minify, plugintest.Behavior{Name: "project", RecordPath: recordPath})
+	plugintest.Install(t, testProgram, pathDir, minify, plugintest.Behavior{Name: "path", RecordPath: recordPath})
+	result := runPlugins(t, projectDir, []string{minify}, Options{Environment: []string{"PATH=" + pathDir}})
 	if result.err != nil {
 		t.Fatalf("%v\n%s", result.err, result.stderr)
 	}
@@ -388,21 +391,22 @@ func TestRunIgnoresPath(t *testing.T) {
 // TestRunOrder checks that plugins run one at a time, in order, and that
 // each sees the changes of the ones before it.
 func TestRunOrder(t *testing.T) {
+	first, second, third := plugintest.ProgramPath("tools/first"), plugintest.ProgramPath("tools/second"), plugintest.ProgramPath("third")
 	projectDir := t.TempDir()
 	recordPath := filepath.Join(t.TempDir(), "records")
 	writeFile(t, filepath.Join(projectDir, testTempDir, "index.html"), "home", 0o644)
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, first, plugintest.Behavior{
 		Name: "first", RecordPath: recordPath, ListOutput: true,
 		WriteFiles: map[string][]byte{"feed.json": []byte("{}")},
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/second", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, second, plugintest.Behavior{
 		Name: "second", RecordPath: recordPath, ListOutput: true,
 		DeleteFiles: []string{"index.html"},
 	})
-	plugintest.Install(t, testProgram, projectDir, "third", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, third, plugintest.Behavior{
 		Name: "third", RecordPath: recordPath, ListOutput: true,
 	})
-	result := runPlugins(t, projectDir, []string{"tools/first", "tools/second", "third"}, Options{})
+	result := runPlugins(t, projectDir, []string{first, second, third}, Options{})
 	if result.err != nil {
 		t.Fatalf("%v\n%s", result.err, result.stderr)
 	}
@@ -419,9 +423,9 @@ func TestRunOrder(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 	wantPrinted := []string{
-		"Executing tools/first in _site.temp",
-		"Executing tools/second in _site.temp",
-		"Executing third in _site.temp",
+		"Executing " + first + " in _site.temp",
+		"Executing " + second + " in _site.temp",
+		"Executing " + third + " in _site.temp",
 	}
 	if !reflect.DeepEqual(result.printed, wantPrinted) {
 		t.Errorf("printed %q, want %q", result.printed, wantPrinted)
@@ -431,14 +435,15 @@ func TestRunOrder(t *testing.T) {
 // TestRunOutput checks that the plugins' standard output and error reach
 // the console byte for byte, in the order the plugins ran.
 func TestRunOutput(t *testing.T) {
+	first, second := plugintest.ProgramPath("tools/first"), plugintest.ProgramPath("tools/second")
 	projectDir := t.TempDir()
-	plugintest.Install(t, testProgram, projectDir, "tools/first", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, first, plugintest.Behavior{
 		Stdout: []byte("first out\n"), Stderr: []byte("first err\x1b[31m"),
 	})
-	plugintest.Install(t, testProgram, projectDir, "tools/second", plugintest.Behavior{
+	plugintest.Install(t, testProgram, projectDir, second, plugintest.Behavior{
 		Stdout: []byte("second\r\nout\x00\xff"), Stderr: []byte("second err\n"),
 	})
-	result := runPlugins(t, projectDir, []string{"tools/first", "tools/second"}, Options{})
+	result := runPlugins(t, projectDir, []string{first, second}, Options{})
 	if result.err != nil {
 		t.Fatalf("%v\n%s", result.err, result.stderr)
 	}
@@ -451,63 +456,67 @@ func TestRunOutput(t *testing.T) {
 }
 
 func TestRunFailure(t *testing.T) {
+	before, failing, after := plugintest.ProgramPath("tools/before"), plugintest.ProgramPath("tools/failing"), plugintest.ProgramPath("tools/after")
+	failedWith := func(reason string) string { return fmt.Sprintf("plugin %q failed: %s", failing, reason) }
+	notStarted := func(reason string) string { return fmt.Sprintf("plugin %q could not be started: %s", failing, reason) }
 	tests := []struct {
 		name string
-		// prepare installs tools/failing.
-		prepare  func(t *testing.T, projectDir string)
+		// prepare installs the failing plugin.
+		prepare func(t *testing.T, projectDir string)
+		// unixOnly skips the case on Windows.
 		unixOnly bool
 		want     string
 	}{
 		{
 			name: "exit status 1",
 			prepare: func(t *testing.T, projectDir string) {
-				plugintest.Install(t, testProgram, projectDir, "tools/failing", plugintest.Behavior{ExitCode: 1})
+				plugintest.Install(t, testProgram, projectDir, failing, plugintest.Behavior{ExitCode: 1})
 			},
-			want: `plugin "tools/failing" failed: exit status 1`,
+			want: failedWith("exit status 1"),
 		},
 		{
 			name: "exit status 3",
 			prepare: func(t *testing.T, projectDir string) {
-				plugintest.Install(t, testProgram, projectDir, "tools/failing", plugintest.Behavior{ExitCode: 3})
+				plugintest.Install(t, testProgram, projectDir, failing, plugintest.Behavior{ExitCode: 3})
 			},
-			want: `plugin "tools/failing" failed: exit status 3`,
+			want: failedWith("exit status 3"),
 		},
 		{
 			name: "exit status 255",
 			prepare: func(t *testing.T, projectDir string) {
-				plugintest.Install(t, testProgram, projectDir, "tools/failing", plugintest.Behavior{ExitCode: 255})
+				plugintest.Install(t, testProgram, projectDir, failing, plugintest.Behavior{ExitCode: 255})
 			},
-			want: `plugin "tools/failing" failed: exit status 255`,
+			want: failedWith("exit status 255"),
 		},
 		{
 			name: "killed",
 			prepare: func(t *testing.T, projectDir string) {
-				plugintest.Install(t, testProgram, projectDir, "tools/failing", plugintest.Behavior{KillItself: true})
+				plugintest.Install(t, testProgram, projectDir, failing, plugintest.Behavior{KillItself: true})
 			},
 			unixOnly: true,
-			want:     `plugin "tools/failing" failed: signal: killed`,
+			want:     failedWith("signal: killed"),
 		},
 		{
 			name: "a script without a #! line",
 			prepare: func(t *testing.T, projectDir string) {
-				writeScript(t, projectDir, "tools/failing", "echo hello\n")
+				writeScript(t, projectDir, failing, "echo hello\n")
 			},
 			unixOnly: true,
-			want:     `plugin "tools/failing" could not be started: exec format error (a script needs a "#!" line naming its interpreter)`,
+			want:     notStarted(`exec format error (a script needs a "#!" line naming its interpreter)`),
 		},
 		{
 			name: "a missing interpreter",
 			prepare: func(t *testing.T, projectDir string) {
-				writeScript(t, projectDir, "tools/failing", "#!/no/such/interpreter\n")
+				writeScript(t, projectDir, failing, "#!/no/such/interpreter\n")
 			},
 			unixOnly: true,
-			want:     `plugin "tools/failing" could not be started: no such file or directory`,
+			want:     notStarted("no such file or directory"),
 		},
 		{
 			name:     "deleted after the preflight",
 			prepare:  func(t *testing.T, projectDir string) {},
 			unixOnly: true,
-			want:     `plugin "tools/failing" could not be started: no such file or directory`,
+			want:     notStarted("no such file or directory"),
 		},
 	}
 	for _, test := range tests {
@@ -517,10 +526,10 @@ func TestRunFailure(t *testing.T) {
 			}
 			projectDir := t.TempDir()
 			recordPath := filepath.Join(t.TempDir(), "records")
-			plugintest.Install(t, testProgram, projectDir, "tools/before", plugintest.Behavior{Name: "before", RecordPath: recordPath})
-			plugintest.Install(t, testProgram, projectDir, "tools/after", plugintest.Behavior{Name: "after", RecordPath: recordPath})
+			plugintest.Install(t, testProgram, projectDir, before, plugintest.Behavior{Name: "before", RecordPath: recordPath})
+			plugintest.Install(t, testProgram, projectDir, after, plugintest.Behavior{Name: "after", RecordPath: recordPath})
 			test.prepare(t, projectDir)
-			result := runPlugins(t, projectDir, []string{"tools/before", "tools/failing", "tools/after"}, Options{})
+			result := runPlugins(t, projectDir, []string{before, failing, after}, Options{})
 			if got := errorText(result.err); got != test.want {
 				t.Errorf("got  %q\nwant %q", got, test.want)
 			}
@@ -532,7 +541,7 @@ func TestRunFailure(t *testing.T) {
 			if want := []string{"before"}; !reflect.DeepEqual(names, want) {
 				t.Errorf("ran %q, want %q", names, want)
 			}
-			wantPrinted := []string{"Executing tools/before in _site.temp", "Executing tools/failing in _site.temp"}
+			wantPrinted := []string{"Executing " + before + " in _site.temp", "Executing " + failing + " in _site.temp"}
 			if !reflect.DeepEqual(result.printed, wantPrinted) {
 				t.Errorf("printed %q, want %q", result.printed, wantPrinted)
 			}
@@ -540,12 +549,28 @@ func TestRunFailure(t *testing.T) {
 	}
 }
 
+// TestRunScriptOnWindows checks the hint for a plugin that Windows cannot
+// start because it is not a program (M14, Q4).
+func TestRunScriptOnWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows behavior")
+	}
+	projectDir := t.TempDir()
+	writeScript(t, projectDir, "tools/minify.sh", "#!/bin/sh\necho hello\n")
+	result := runPlugins(t, projectDir, []string{"tools/minify.sh"}, Options{})
+	want := `plugin "tools/minify.sh" could not be started: %1 is not a valid Win32 application. (on Windows a plugin must be a program, such as a .exe file)`
+	if got := errorText(result.err); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
 // TestRunFailureKeepsExitError checks that the exit of a failed plugin can
 // still be read from the error.
 func TestRunFailureKeepsExitError(t *testing.T) {
+	failing := plugintest.ProgramPath("tools/failing")
 	projectDir := t.TempDir()
-	plugintest.Install(t, testProgram, projectDir, "tools/failing", plugintest.Behavior{ExitCode: 7})
-	result := runPlugins(t, projectDir, []string{"tools/failing"}, Options{})
+	plugintest.Install(t, testProgram, projectDir, failing, plugintest.Behavior{ExitCode: 7})
+	result := runPlugins(t, projectDir, []string{failing}, Options{})
 	var exitErr *exec.ExitError
 	if !errors.As(result.err, &exitErr) || exitErr.ExitCode() != 7 {
 		t.Errorf("got %v, want an *exec.ExitError with code 7", result.err)

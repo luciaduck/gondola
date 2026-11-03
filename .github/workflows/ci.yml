@@ -15,14 +15,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        # M15: macos-latest.
+        os: [ubuntu-latest, windows-latest]
         # Oldest supported Go and newest release.
         go: [go.mod, stable]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     env:
       # Pinned: the golden CSS files depend on its formatting. Update both together.
       SASS_VERSION: 1.106.1
-      SASS_SHA256: ad99cccb90de4ad2926e03e32d819c83baf32c3dbff56da92df0eed10e604d60
+      SASS_SHA256_LINUX: ad99cccb90de4ad2926e03e32d819c83baf32c3dbff56da92df0eed10e604d60
+      SASS_SHA256_WINDOWS: a6e5bf97187af4a175279eabb6316af597d6e4b06ec2099ae961dc553655d8e1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -33,26 +38,39 @@ jobs:
           go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
 
       # Not npm's sass: it has no --embedded mode.
-      - name: Install Dart Sass
+      - name: Install Dart Sass (Linux)
+        if: runner.os == 'Linux'
         run: |
           archive="dart-sass-${SASS_VERSION}-linux-x64.tar.gz"
           curl --fail --silent --show-error --location \
             --output "$RUNNER_TEMP/$archive" \
             "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/${archive}"
-          echo "${SASS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          echo "${SASS_SHA256_LINUX}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
           tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/dart-sass" >> "$GITHUB_PATH"
 
-      # The Sass tests skip silently when sass is missing.
-      - name: Check Dart Sass
+      - name: Install Dart Sass (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          installed="$(sass --version)"
-          if [ "$installed" != "$SASS_VERSION" ]; then
-            echo "expected Dart Sass $SASS_VERSION, found: $installed"
-            exit 1
-          fi
+          $archive = "dart-sass-$env:SASS_VERSION-windows-x64.zip"
+          $archivePath = Join-Path $env:RUNNER_TEMP $archive
+          Invoke-WebRequest -Uri "https://github.com/sass/dart-sass/releases/download/$env:SASS_VERSION/$archive" -OutFile $archivePath
+          if ((Get-FileHash $archivePath -Algorithm SHA256).Hash -ne $env:SASS_SHA256_WINDOWS) { throw "checksum mismatch for $archive" }
+          Expand-Archive $archivePath -DestinationPath $env:RUNNER_TEMP
+          Add-Content $env:GITHUB_PATH (Join-Path $env:RUNNER_TEMP 'dart-sass')
 
+      # The Sass tests skip silently when sass is missing. PowerShell finds
+      # sass.bat on Windows, as Gondola does.
+      - name: Check Dart Sass
+        shell: pwsh
+        run: |
+          $installed = sass --version
+          if ($installed -ne $env:SASS_VERSION) { throw "expected Dart Sass $env:SASS_VERSION, found: $installed" }
+
+      # The source is the same on every system: checked once, on Linux.
       - name: gofmt
+        if: runner.os == 'Linux'
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
@@ -63,6 +81,7 @@ jobs:
 
       # See CLAUDE.md. grep exits 1 for no match, 2 for an error.
       - name: Invisible characters in Go source
+        if: runner.os == 'Linux'
         run: |
           status=0
           grep -rnP '[\x{0085}\x{2028}\x{2029}\x{FEFF}]' --include='*.go' . || status=$?
@@ -75,5 +94,6 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # -race needs a C compiler, which only the Linux runner is sure to have.
       - name: go test
-        run: go test -race ./...
+        run: go test ${{ runner.os == 'Linux' && '-race' || '' }} ./...

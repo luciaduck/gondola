@@ -35,8 +35,8 @@ func compilePattern(written config.PassthroughPattern, ignoresLetterCase bool) (
 	at := written.Position
 	// path.Match reads "\" as an escape, but a Windows user who writes one
 	// means a directory separator. Refusing it keeps both readings out.
-	if strings.Contains(text, `\`) {
-		return pattern{}, at.Errorf(`%s %q contains "\"; please separate directories with "/"`, passthroughLabel, text)
+	if problem := config.PathCharacterProblem(text); problem != "" {
+		return pattern{}, at.Errorf("%s %q %s", passthroughLabel, text, problem)
 	}
 	relative := strings.TrimPrefix(text, "/")
 	// ".." is looked for before cleaning, which would remove "a/../b", and a

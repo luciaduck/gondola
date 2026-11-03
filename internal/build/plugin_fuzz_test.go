@@ -18,7 +18,7 @@ import (
 const maxFuzzFileNameBytes = 120
 
 // fuzzBuildPluginPath is the plugin of FuzzBuildPlugin's project.
-const fuzzBuildPluginPath = "tools/fuzz"
+var fuzzBuildPluginPath = plugintest.ProgramPath("tools/fuzz")
 
 // isFuzzableOutputFile reports whether name can be a file that a plugin
 // writes in the temp output: a clean relative path written with "/",

@@ -43,10 +43,6 @@ const executeBits = 0o111
 // word, so a path made only of them needs no quotes in the chmod hint.
 const shellSafeCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./+,:@%="
 
-// scriptHint follows "exec format error", the error of a script without a
-// "#!" line on Unix (M11, Q3).
-const scriptHint = ` (a script needs a "#!" line naming its interpreter)`
-
 // Printer is the part of the console that plugins write to.
 // *console.Printer implements it.
 type Printer interface {
@@ -161,8 +157,8 @@ func runPlugin(command *exec.Cmd, pluginPath string) error {
 	if err := command.Start(); err != nil {
 		reason := withoutPath(err)
 		hint := ""
-		if errors.Is(reason, syscall.ENOEXEC) {
-			hint = scriptHint
+		if isNotAProgram(reason) {
+			hint = notAProgramHint
 		}
 		return fmt.Errorf("plugin %q could not be started: %w%s", pluginPath, reason, hint)
 	}
