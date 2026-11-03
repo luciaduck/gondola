@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/luciaduck/gondola/actions/workflows/ci.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/ci.yml)
 
-> Note: this readme was written by a human, so it has some quirks and a bit of humor. I promise the content is serious though: a chatobot approved it!
+> Note: this readme was written by a human, so it has some quirks and a bit of humor. I promise the content is serious though: a chatbot approved it!
 
 Gondola is a *gliding* **static site generator** written in Go. 
 
-It is inspired by 11ty and it is kind of a love letter to its *awesome* configuration approach. However it aims at Go's speed and at the smallest number of dependencies possible.
+It is inspired by 11ty and it is kind of a love letter to its *awesome* configuration approach. However, it aims at Go's speed and at the smallest number of dependencies possible.
 
 ## Tell me more
 
@@ -14,7 +14,7 @@ Gondola's philosophy is letting the developer configure whatever they care to ha
 
 The config file is roughly **30 lines** long.
 
-Gondola's ideal user has either used 11ty, or Jekyll or no SSG at all. Most conventional fallbacks are taken from those.
+Gondola's ideal user has used 11ty, Jekyll or no SSG at all. Most conventional fallbacks are taken from those.
 
 At the time of this release, Gondola uses Jet templates only. Liquid templates are planned to be added in the future. 
 
@@ -22,9 +22,9 @@ At the time of this release, Gondola uses Jet templates only. Liquid templates a
 
 `go install github.com/luciaduck/gondola/cmd/gondola@latest`
 
-It needs Go 1.27 or newer. If your site uses sass, Gondola will need Dart Sass 1.63.0 or newer installed on the machine. Get it [here](https://sass-lang.com/install), not from npm, because Gondola can't manage it otherwise.
+It needs Go 1.27 or newer. If your site uses Sass, Gondola will need Dart Sass 1.63.0 or newer installed on the machine. Get it [here](https://sass-lang.com/install), not from npm, because Gondola can't manage it otherwise.
 
-Go bin's folder must be in PATH.
+Go's bin folder must be in PATH.
 
 ## How to use Gondola
 
@@ -42,7 +42,7 @@ See **Configuration** below to learn how to set up Gondola.
 
 ## Configuration
 
-The configuration file can be as short as 4 lines if you like all the proposed fallbacks written below. However, I really do recommend to at least decide on a default.layout and any passthroughs you need.
+The configuration file can be as short as 4 lines if you like all the proposed fallbacks written below. However, I really do recommend at least deciding on on `default.layout` and any passthroughs you need.
 
 Copy this block and save it as gondola.yaml at the repo's root.
 
@@ -74,16 +74,17 @@ output:
   passthrough: []
 
 default:                                # values used when a page leaves a key empty
-  layout: nil                           # "nil" = no layout; I recommend configure a real default
+  layout: nil                           # "nil" = no layout; I recommend setting a real default
   title: ""
   author: ""
   date: ""
   permalink: path                       # path | slug | date
-  ```
-  If you plan to use fenced blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
+```
+
+If you plan to use fenced blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
 
 ## License and contributing
 
-WIP (I promise this section will come soon! If you're impatient clone this repo and run `go build ./cmd/gondola`). I authorize this use even if a license isn't yet here.
+WIP (I promise this section will come soon! If you're impatient, clone this repo and run `go build ./cmd/gondola`).
 
 Enjoy Gondola!
