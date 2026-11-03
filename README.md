@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/luciaduck/gondola/actions/workflows/ci.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/ci.yml)
 
-> Note: this readme was written by a human, so it has some quirks and a bit of humor. I promise the content is serious though: AI approved it!
+> Note: this readme was written by a human, so it has some quirks and a bit of humor. I promise the content is serious though: a chatobot approved it!
 
 Gondola is a *gliding* **static site generator** written in Go. 
 
