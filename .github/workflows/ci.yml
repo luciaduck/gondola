@@ -1,0 +1,79 @@
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (${{ matrix.os }}, Go ${{ matrix.go }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # Oldest supported Go and newest release.
+        go: [go.mod, stable]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Pinned: the golden CSS files depend on its formatting. Update both together.
+      SASS_VERSION: 1.106.1
+      SASS_SHA256: ad99cccb90de4ad2926e03e32d819c83baf32c3dbff56da92df0eed10e604d60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # An empty input counts as unset.
+          go-version: ${{ matrix.go == 'stable' && 'stable' || '' }}
+          go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
+
+      # Not npm's sass: it has no --embedded mode.
+      - name: Install Dart Sass
+        run: |
+          archive="dart-sass-${SASS_VERSION}-linux-x64.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/${archive}"
+          echo "${SASS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/dart-sass" >> "$GITHUB_PATH"
+
+      # The Sass tests skip silently when sass is missing.
+      - name: Check Dart Sass
+        run: |
+          installed="$(sass --version)"
+          if [ "$installed" != "$SASS_VERSION" ]; then
+            echo "expected Dart Sass $SASS_VERSION, found: $installed"
+            exit 1
+          fi
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "files not formatted with gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      # See CLAUDE.md. grep exits 1 for no match, 2 for an error.
+      - name: Invisible characters in Go source
+        run: |
+          status=0
+          grep -rnP '[\x{0085}\x{2028}\x{2029}\x{FEFF}]' --include='*.go' . || status=$?
+          case "$status" in
+            0) echo "write these characters as escapes, such as \"\\u2028\""; exit 1 ;;
+            1) ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race ./...
