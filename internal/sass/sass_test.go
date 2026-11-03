@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -186,7 +187,7 @@ func TestCompileErrorsInProjectWrittenInOtherLetters(t *testing.T) {
 	if realErr != nil || writtenErr != nil || !os.SameFile(realInfo, writtenInfo) {
 		t.Skip("this file system does not ignore letter case")
 	}
-	compiler, err := Start(Options{ProjectDir: writtenDir, ExecutablePath: executablePath, Input: defaultInput(), Style: Expanded})
+	compiler, err := Start(Options{ProjectDir: writtenDir, ExecutablePath: executablePath, Input: defaultInput(), Style: Expanded, IgnoresLetterCase: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,6 +502,38 @@ func TestDisplayedPathResolvedRoot(t *testing.T) {
 		if got := compiler.displayedPath(test.filePath); got != test.want {
 			t.Errorf("displayedPath(%q) = %q, want %q", test.filePath, got, test.want)
 		}
+	}
+}
+
+// TestDisplayedPathIgnoringCase checks that the project is found in other
+// letters only when the file system ignores letter case.
+func TestDisplayedPathIgnoringCase(t *testing.T) {
+	baseDir := t.TempDir()
+	writtenDir := filepath.Join(baseDir, "site")
+	onDisk := filepath.Join(baseDir, "Site", "_components", "sass", "_broken.scss")
+	besideProject := filepath.Join(baseDir, "Sitex", "a.scss")
+	type caseTest struct {
+		name              string
+		ignoresLetterCase bool
+		filePath          string
+		want              string
+	}
+	tests := []caseTest{
+		{"other letters, case ignored", true, onDisk, "_components/sass/_broken.scss"},
+		{"a longer name is not inside", true, besideProject, filepath.ToSlash(besideProject)},
+		{"the root itself", true, filepath.Join(baseDir, "SITE"), filepath.ToSlash(filepath.Join(baseDir, "SITE"))},
+	}
+	// filepath.Rel already ignores letter case on Windows.
+	if runtime.GOOS != "windows" {
+		tests = append(tests, caseTest{"other letters, case matters", false, onDisk, filepath.ToSlash(onDisk)})
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			compiler := &Compiler{projectDir: writtenDir, ignoresLetterCase: test.ignoresLetterCase}
+			if got := compiler.displayedPath(test.filePath); got != test.want {
+				t.Errorf("displayedPath(%q) = %q, want %q", test.filePath, got, test.want)
+			}
+		})
 	}
 }
 

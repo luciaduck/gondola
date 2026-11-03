@@ -47,6 +47,9 @@ type Options struct {
 	// PrintWarning receives each warning of Dart Sass (@warn, @debug and
 	// deprecations), already formatted, once per build.
 	PrintWarning func(text string)
+	// IgnoresLetterCase is config.Config.IgnoresLetterCase: whether the
+	// project's file system ignores letter case.
+	IgnoresLetterCase bool
 }
 
 // Compiler compiles the entry points of one build. Create it with Start and
@@ -58,10 +61,16 @@ type Compiler struct {
 	// partials it finds by their long names. It is "" when it cannot be
 	// found or equals projectDir.
 	resolvedProjectDir string
-	partialDirs        []string // absolute paths
-	style              godartsass.OutputStyle
-	printWarning       func(text string)
-	transpiler         *godartsass.Transpiler
+	// ignoresLetterCase lets displayedPath find the project in other
+	// letters: on macOS and Windows Dart Sass reports the partials it finds
+	// in their letters on disk, which may differ from how the project
+	// directory was written (Site for site), and on macOS filepath.Rel
+	// compares letters exactly.
+	ignoresLetterCase bool
+	partialDirs       []string // absolute paths
+	style             godartsass.OutputStyle
+	printWarning      func(text string)
+	transpiler        *godartsass.Transpiler
 
 	// printedWarnings holds the warnings printed in this build, so that a
 	// partial used by several entry points does not repeat its warnings.
@@ -97,6 +106,7 @@ func Start(options Options) (*Compiler, error) {
 	compiler := &Compiler{
 		projectDir:         projectDir,
 		resolvedProjectDir: resolvedProjectDir,
+		ignoresLetterCase:  options.IgnoresLetterCase,
 		partialDirs:        partialDirs,
 		style:              style,
 		printWarning:       options.PrintWarning,
@@ -312,7 +322,7 @@ func (c *Compiler) fileText(filePath, entryFilePath, entryText string) (string, 
 // displayedPath returns filePath relative to the project root, with "/", or
 // the absolute path with "/" when it lies outside the project. The root is
 // tried as written and then resolved, since Dart Sass may name a file either
-// way.
+// way, and in any letters where the file system ignores letter case.
 func (c *Compiler) displayedPath(filePath string) string {
 	for _, rootDir := range []string{c.projectDir, c.resolvedProjectDir} {
 		if rootDir == "" {
@@ -322,8 +332,24 @@ func (c *Compiler) displayedPath(filePath string) string {
 		if err == nil && relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
 			return filepath.ToSlash(relativePath)
 		}
+		if relativePath, ok := relativeIgnoringCase(rootDir, filePath); ok && c.ignoresLetterCase {
+			return filepath.ToSlash(relativePath)
+		}
 	}
 	return filepath.ToSlash(filePath)
+}
+
+// relativeIgnoringCase returns filePath relative to rootDir when filePath
+// starts with rootDir, in any letters, and a separator. Both are absolute
+// and clean. A root whose other spelling has another length in bytes, as
+// with the Kelvin sign for "K", is not recognized; the path is then shown
+// absolute.
+func relativeIgnoringCase(rootDir, filePath string) (string, bool) {
+	prefix := strings.TrimSuffix(rootDir, string(filepath.Separator)) + string(filepath.Separator)
+	if len(filePath) <= len(prefix) || !strings.EqualFold(filePath[:len(prefix)], prefix) {
+		return "", false
+	}
+	return filePath[len(prefix):], true
 }
 
 // Close stops Dart Sass.

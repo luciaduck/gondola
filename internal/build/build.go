@@ -309,6 +309,9 @@ func (b *builder) compileSass(entryPoints []scan.SassEntryPoint, executablePath 
 		Input:          b.cfg.Input,
 		Style:          b.options.SassStyle,
 		PrintWarning:   b.options.Printer.Warning,
+		// On macOS and Windows Dart Sass names files in their letters on
+		// disk, which messages must still show relative to the project.
+		IgnoresLetterCase: b.cfg.IgnoresLetterCase,
 	})
 	if err != nil {
 		return err

@@ -30,7 +30,7 @@ Go bin's folder must be in PATH.
 
 Launch it in the folder that holds the gondola.yaml configuration file (i.e. your site's repo).
 
-See **Configuration** below to learn how to configure Gondola.
+See **Configuration** below to learn how to set up Gondola.
 
 **Three commands:**
 - `gondola ride`: it builds the site in the output directory
@@ -39,10 +39,6 @@ See **Configuration** below to learn how to configure Gondola.
 
 - `gondola --help`: lists the commands *(I know, boring: one could expect a gondola coming to rescue you)*.
 
-
-## License and contributing
-
-WIP (I promise this will come soon! `go build ./cmd/gondola`)
 
 ## Configuration
 
@@ -85,5 +81,9 @@ default:                                # values used when a page leaves a key e
   permalink: path                       # path | slug | date
   ```
   If you plan to use fenced blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
- 
- Enjoy Gondola!
+
+## License and contributing
+
+WIP (I promise this section will come soon! If you're impatient clone this repo and run `go build ./cmd/gondola`). I authorize this use even if a license isn't yet here.
+
+Enjoy Gondola!
