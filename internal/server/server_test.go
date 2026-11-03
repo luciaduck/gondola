@@ -608,12 +608,45 @@ func TestRunClosesAfterTheRunningBuild(t *testing.T) {
 				t.Errorf("%d builds, want 2", builds.count)
 			}
 			// Only the first help line, after Server ready: the build that
-			// ends with closing prints none.
+			// ends with closing prints none. Ctrl+C reaches the loop at
+			// once; a typed q goes through the reading goroutine and may
+			// arrive after the build ended, so TestLoopQuitDuringBuild
+			// checks q on the loop itself.
+			if test.name != "Ctrl+C" {
+				return
+			}
 			help := "Type g and Enter to rebuild, or q and Enter to close.\n"
 			if strings.Count(h.output.String(), help) != 1 {
 				t.Errorf("output:\n%s\nwant the help line once", h.output.String())
 			}
 		})
+	}
+}
+
+// TestLoopQuitDuringBuild checks that a rebuild that ends after q was
+// received prints no help line and closes the server.
+func TestLoopQuitDuringBuild(t *testing.T) {
+	builds := newFakeBuilds(map[int]bool{1: true}, nil)
+	output := &strings.Builder{}
+	stream := console.Stream{Writer: output}
+	s := &devServer{
+		options:     Options{Build: builds.build, Printer: console.New(stream, stream, os.DirFS(t.TempDir()))},
+		port:        builds.cfg.Settings.Port,
+		outputDir:   builds.cfg.Output.Dir,
+		configKnown: true,
+	}
+	received := newCommands()
+	signal(received.rebuild)
+	closedNormally := make(chan bool, 1)
+	go func() { closedNormally <- s.loop(context.Background(), received, nil) }()
+	receive(t, builds.started, "the rebuild")
+	close(received.quit)
+	builds.release <- struct{}{}
+	if !receive(t, closedNormally, "the loop to return") {
+		t.Error("the loop reported that it did not close normally")
+	}
+	if output.Len() != 0 {
+		t.Errorf("output %q, want nothing", output.String())
 	}
 }
 
