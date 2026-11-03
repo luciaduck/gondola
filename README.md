@@ -6,7 +6,7 @@
 
 Gondola is a *gliding* **static site generator** written in Go. 
 
-It is inspired by 11ty and it is kind of a love letter to its *awesome* configuration approach. However it aims at Go's speed and at the shortest number of dependencies possible.
+It is inspired by 11ty and it is kind of a love letter to its *awesome* configuration approach. However it aims at Go's speed and at the smallest number of dependencies possible.
 
 ## Tell me more
 
@@ -23,6 +23,8 @@ At the time of this release, Gondola uses Jet templates only. Liquid templates a
 `go install github.com/luciaduck/gondola/cmd/gondola@latest`
 
 It needs Go 1.27 or newer. If your site uses sass, Gondola will need Dart Sass 1.63.0 or newer installed on the machine. Get it [here](https://sass-lang.com/install), not from npm, because Gondola can't manage it otherwise.
+
+Go bin's folder must be in PATH.
 
 ## How to use Gondola
 
@@ -52,7 +54,7 @@ Copy this block and save it as gondola.yaml at the repo's root.
 config:
   site-name: "My site"                  # required
   version: "0.1.0"                      # required; the version of the *site*
-  canonical-url: "[https://example.com](https://example.com)"  # required; absolute http(s) URL, trailing slash removed
+  canonical-url: "https://example.com"  # required; absolute http(s) URL, trailing slash removed
   description: ""                       # optional
   sass: true
   fenced-blocks: false                  # true = run Squero; requires markdown: true
@@ -76,12 +78,12 @@ output:
   passthrough: []
 
 default:                                # values used when a page leaves a key empty
-  layout: nil                           # "nil" = no layout; users should configure a real default
+  layout: nil                           # "nil" = no layout; I recommend configure a real default
   title: ""
   author: ""
   date: ""
   permalink: path                       # path | slug | date
   ```
-  If you plan to use fencing blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
+  If you plan to use fenced blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
  
  Enjoy Gondola!

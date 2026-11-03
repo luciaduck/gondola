@@ -1,0 +1,51 @@
+name: macOS
+
+# Started by hand from the Actions tab: macOS minutes count ten times in a
+# private repository, and macOS runners can wait long in GitHub's queue.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (macos-latest, Go stable)
+    # Apple silicon.
+    runs-on: macos-latest
+    env:
+      # Pinned like in ci.yml: the golden CSS files depend on its formatting.
+      SASS_VERSION: 1.106.1
+      SASS_SHA256_MACOS: 8a54a73d611abf47524c736761172a4efa7bc06081ee2b4131fd0c141d213a20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+
+      # Not npm's sass: it has no --embedded mode. macOS has no sha256sum.
+      - name: Install Dart Sass
+        run: |
+          archive="dart-sass-${SASS_VERSION}-macos-arm64.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/${archive}"
+          echo "${SASS_SHA256_MACOS}  $RUNNER_TEMP/$archive" | shasum --algorithm 256 --check
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/dart-sass" >> "$GITHUB_PATH"
+
+      # The Sass tests skip silently when sass is missing.
+      - name: Check Dart Sass
+        run: |
+          installed="$(sass --version)"
+          if [ "$installed" != "$SASS_VERSION" ]; then
+            echo "expected Dart Sass $SASS_VERSION, found: $installed"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race ./...

@@ -15,14 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macOS has its own workflow, macos.yml, started by hand.
+        os: [ubuntu-latest, windows-latest]
         # Oldest supported Go and newest release.
         go: [go.mod, stable]
-        # macOS minutes count ten times in a private repository; the oldest
-        # Go is tested on the other two systems.
-        exclude:
-          - os: macos-latest
-            go: go.mod
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -32,8 +28,6 @@ jobs:
       SASS_VERSION: 1.106.1
       SASS_SHA256_LINUX: ad99cccb90de4ad2926e03e32d819c83baf32c3dbff56da92df0eed10e604d60
       SASS_SHA256_WINDOWS: a6e5bf97187af4a175279eabb6316af597d6e4b06ec2099ae961dc553655d8e1
-      # macos-latest runs on Apple silicon.
-      SASS_SHA256_MACOS: 8a54a73d611abf47524c736761172a4efa7bc06081ee2b4131fd0c141d213a20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -44,20 +38,14 @@ jobs:
           go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
 
       # Not npm's sass: it has no --embedded mode.
-      - name: Install Dart Sass (Linux and macOS)
-        if: runner.os != 'Windows'
+      - name: Install Dart Sass (Linux)
+        if: runner.os == 'Linux'
         run: |
-          if [ "$RUNNER_OS" = macOS ]; then
-            platform=macos-arm64 checksum="$SASS_SHA256_MACOS"
-          else
-            platform=linux-x64 checksum="$SASS_SHA256_LINUX"
-          fi
-          archive="dart-sass-${SASS_VERSION}-${platform}.tar.gz"
+          archive="dart-sass-${SASS_VERSION}-linux-x64.tar.gz"
           curl --fail --silent --show-error --location \
             --output "$RUNNER_TEMP/$archive" \
             "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/${archive}"
-          # shasum is on both systems; macOS has no sha256sum.
-          echo "${checksum}  $RUNNER_TEMP/$archive" | shasum --algorithm 256 --check
+          echo "${SASS_SHA256_LINUX}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
           tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/dart-sass" >> "$GITHUB_PATH"
 
@@ -106,6 +94,6 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      # -race needs a C compiler, which the Windows runner is not sure to have.
+      # -race needs a C compiler, which only the Linux runner is sure to have.
       - name: go test
-        run: go test ${{ runner.os != 'Windows' && '-race' || '' }} ./...
+        run: go test ${{ runner.os == 'Linux' && '-race' || '' }} ./...
