@@ -38,7 +38,8 @@ See **Configuration** below to learn how to set up Gondola.
 
 - `gondola serve`: it builds the site and serves it at port 1094 (or any port you chose in config)
 
-- `gondola --help`: lists the commands *(I know, boring: one could expect a gondola coming to rescue you)*.
+- `gondola --help`: lists the commands *(I know, boring: one could expect a gondola coming to the rescue)*
+- `gondola --version`: shows the version you're running.
 
 
 ## Configuration
