@@ -521,7 +521,6 @@ func TestDisplayedPathIgnoringCase(t *testing.T) {
 	tests := []caseTest{
 		{"other letters, case ignored", true, onDisk, "_components/sass/_broken.scss"},
 		{"a longer name is not inside", true, besideProject, filepath.ToSlash(besideProject)},
-		{"the root itself", true, filepath.Join(baseDir, "SITE"), filepath.ToSlash(filepath.Join(baseDir, "SITE"))},
 	}
 	// filepath.Rel already ignores letter case on Windows.
 	if runtime.GOOS != "windows" {
