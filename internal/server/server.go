@@ -1,8 +1,12 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package server is the development server of `gondola serve`: it builds the
 // site, serves the output directory over HTTP on localhost, and builds again
-// when the user types g and Enter. Its code comes from the maintainer's
-// library sandolo, adapted so that commands come from an io.Reader and the
-// listener is opened before anything about it is printed (SPEC §5.16).
+// when the user types g and Enter.
 package server
 
 import (

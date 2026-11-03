@@ -1,6 +1,7 @@
 # gondola
 
 [![CI](https://github.com/luciaduck/gondola/actions/workflows/ci.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/ci.yml)
+[![macOS](https://github.com/luciaduck/gondola/actions/workflows/macos.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/macos.yml)
 
 > Note: this readme was written by a human, so it has some quirks and a bit of humor. I promise the content is serious though: a chatbot approved it!
 
@@ -83,8 +84,16 @@ default:                                # values used when a page leaves a key e
 
 If you plan to use fenced blocks, you might want to add an alias.squero file at the root of the repo. I will explain how Squero works in more detail soon. For now, I can link to its own repository, [whose readme](https://github.com/luciaduck/squero) was written by a cold LLM, so it's not as cool as this one. Sorry.
 
-## License and contributing
+## License
 
-WIP (I promise this section will come soon! If you're impatient, clone this repo and run `go build ./cmd/gondola`).
+This project is licensed under the [Mozilla Public License 2.0](LICENSE). 
+
+> **In short:** MPL is a weak copyleft license. You can use Gondola for free and for any use (including commercial). Anyone who distributes a modified version must share the changes to Gondola's files under the MPL too.
+
+## Contributing
+
+I promise this section will come soon! If you're impatient, clone this repo and run `go build ./cmd/gondola`.
+
+## Thanks for reading
 
 Enjoy Gondola!

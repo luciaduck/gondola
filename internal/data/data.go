@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package data loads the data files of input.data, which templates read
 // under the variable data: _data/site-info.json becomes data.siteInfo, and
 // _data/blog/authors.yaml becomes data.blog.authors.

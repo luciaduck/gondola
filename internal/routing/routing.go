@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package routing works out where each page is written in the output and
 // the URL that reaches it, from the page's path in the content directory,
 // its permalink and the setting output.routing (SPEC §5.7).

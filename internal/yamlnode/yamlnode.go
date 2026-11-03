@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package yamlnode holds what Gondola's YAML readers share (gondola.yaml,
 // front matter, and later the data files): the rule for empty values, the
 // conversion of yaml.v3's positions and errors to positions in the file, and

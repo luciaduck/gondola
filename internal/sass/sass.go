@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package sass compiles the Sass entry points found by package scan into CSS
 // files in the temp output, through the Dart Sass executable driven by
 // godartsass (SPEC §5.10). Imports are resolved next to the importing file

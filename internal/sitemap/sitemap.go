@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package sitemap writes sitemap.xml, the list of the site's pages for
 // search engines, and reads robots.txt to leave out the pages that crawlers
 // may not visit (SPEC §5.12). The robots.txt matcher is written by hand,

@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package engine is everything about the template language: it finds the
 // layouts of a page, runs a page body and its layouts through Jet, and turns
 // Jet's errors into messages that point into the user's files (SPEC §5.11).

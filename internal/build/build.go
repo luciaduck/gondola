@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package build runs the stages of a build in order (SPEC §3.1): it reads
 // gondola.yaml, finds the files, prepares and renders the pages, compiles
 // Sass, copies the passthrough files and publishes the result. It owns the

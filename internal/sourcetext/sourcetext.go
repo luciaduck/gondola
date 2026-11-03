@@ -1,3 +1,9 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package sourcetext holds the Encoding rule of SPEC §4, shared by every
 // package that reads a source file (gondola.yaml, pages, layouts,
 // alias.squero, and later the data files): UTF-16 is refused, and a UTF-8

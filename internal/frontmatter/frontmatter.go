@@ -1,12 +1,13 @@
+// Copyright (c) 2026 Lucia Capurri
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package frontmatter splits a source file (a page or a layout template)
 // into its YAML front matter and its body, reads the front matter's
 // variables under their template names, and merges the variables of a page
 // with those of its layouts and the defaults of gondola.yaml.
-//
-// The split is written by hand rather than with a library: Gondola needs a
-// block that starts on the first line, an error for a block that is never
-// closed, and the exact number of lines before the body (SPEC §5.4). Only
-// YAML is supported; another format would be detected in cutBlock.
 package frontmatter
 
 import (

@@ -1,8 +1,10 @@
 name: macOS
 
-# Started by hand from the Actions tab: macOS minutes count ten times in a
-# private repository, and macOS runners can wait long in GitHub's queue.
+# Not on every push: macOS runners can wait long in GitHub's queue.
+# Weekly, so the badge stays recent; also started by hand from the Actions tab.
 on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
   workflow_dispatch:
 
 permissions:
