@@ -1,4 +1,4 @@
-# gondola
+# Gondola
 
 [![CI](https://github.com/luciaduck/gondola/actions/workflows/ci.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/ci.yml)
 [![macOS](https://github.com/luciaduck/gondola/actions/workflows/macos.yml/badge.svg)](https://github.com/luciaduck/gondola/actions/workflows/macos.yml)
