@@ -168,6 +168,42 @@ func TestCompileErrors(t *testing.T) {
 	}
 }
 
+// TestCompileErrorsInProjectWrittenInOtherLetters checks that errors name
+// files relative to the project when the project directory is written in
+// other letters than on disk ("site" for "Site"), as a shell may keep after
+// "cd site" where letter case is ignored. Dart Sass may report the partials
+// it finds in their letters on disk. Where letter case matters, "site" does
+// not exist and there is nothing to check.
+func TestCompileErrorsInProjectWrittenInOtherLetters(t *testing.T) {
+	executablePath := requireSass(t)
+	baseDir := writeSite(t, map[string]string{
+		"Site/assets/main.scss":              "@use 'broken';\n",
+		"Site/_components/sass/_broken.scss": "a { b: $nope; }\n",
+	})
+	writtenDir := filepath.Join(baseDir, "site")
+	realInfo, realErr := os.Stat(filepath.Join(baseDir, "Site"))
+	writtenInfo, writtenErr := os.Stat(writtenDir)
+	if realErr != nil || writtenErr != nil || !os.SameFile(realInfo, writtenInfo) {
+		t.Skip("this file system does not ignore letter case")
+	}
+	compiler, err := Start(Options{ProjectDir: writtenDir, ExecutablePath: executablePath, Input: defaultInput(), Style: Expanded})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeCompiler(t, compiler)
+	errs, err := compiler.CompileAll(entryPoints("assets/main.scss"), t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error that stops the build: %v", err)
+	}
+	var got []string
+	for _, compileErr := range errs {
+		got = append(got, compileErr.Error())
+	}
+	if want := []string{`_components/sass/_broken.scss:1:8: Undefined variable.`}; !reflect.DeepEqual(got, want) {
+		t.Errorf("errors\n got %q\nwant %q", got, want)
+	}
+}
+
 func TestCompileErrorsAreReturnedOnce(t *testing.T) {
 	files := map[string]string{
 		"a.scss":                        "@use 'broken';\n",
